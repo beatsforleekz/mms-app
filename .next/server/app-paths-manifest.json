@@ -1,0 +1,15 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/assets/page": "app/assets/page.js",
+  "/page": "app/page.js",
+  "/catalogues/page": "app/catalogues/page.js",
+  "/payees/page": "app/payees/page.js",
+  "/qa/page": "app/qa/page.js",
+  "/releases/[id]/page": "app/releases/[id]/page.js",
+  "/releases/page": "app/releases/page.js",
+  "/statements/page": "app/statements/page.js",
+  "/contracts/page": "app/contracts/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/contract-generator/page": "app/contract-generator/page.js",
+  "/actions/page": "app/actions/page.js"
+}
