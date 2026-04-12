@@ -361,17 +361,17 @@
       border-right: 1px solid var(--border);
       display: flex; align-items: center; padding: 6px 8px;
     }
-    .checklist-cell.asset-name input {
+    .checklist-cell.asset-name input[type="text"] {
       width: 100%; padding: 4px 6px;
       border: 1px solid transparent; border-radius: 4px;
       font-size: 13px; font-weight: 500; color: var(--text);
       background: transparent; outline: none;
       transition: border-color .12s, background .12s;
     }
-    .checklist-cell.asset-name input:hover { border-color: var(--border); background: var(--bg); }
-    .checklist-cell.asset-name input:focus { border-color: var(--accent); background: var(--surface); font-weight: 500; }
-    .checklist-cell.asset-name input::placeholder { color: #bbb; font-weight: 400; }
-    .checklist-row.not-required .checklist-cell.asset-name input { color: var(--muted); font-weight: 400; }
+    .checklist-cell.asset-name input[type="text"]:hover { border-color: var(--border); background: var(--bg); }
+    .checklist-cell.asset-name input[type="text"]:focus { border-color: var(--accent); background: var(--surface); font-weight: 500; }
+    .checklist-cell.asset-name input[type="text"]::placeholder { color: #bbb; font-weight: 400; }
+    .checklist-row.not-required .checklist-cell.asset-name input[type="text"] { color: var(--muted); font-weight: 400; }
     .checklist-cell.asset-dropbox { border-right: 1px solid var(--border); }
     .checklist-cell.asset-dropbox input { width: 100%; padding: 4px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; color: var(--text); background: transparent; outline: none; transition: border-color .12s, background .12s; }
     .checklist-cell.asset-dropbox input:hover { border-color: var(--border); background: var(--bg); }
@@ -1817,10 +1817,12 @@
 
             <!-- Row 2: Release + Status -->
             <div class="contract-form-field">
-              <label class="contract-form-label" for="cf-release">Linked Release</label>
-              <select class="contract-form-select" id="cf-release">
-                <option value="">— none —</option>
-              </select>
+              <label class="contract-form-label" for="cf-release-search">Linked Release</label>
+              <input class="contract-form-input" id="cf-release-search" type="text" placeholder="Search catalogue…" autocomplete="off" />
+              <input type="hidden" id="cf-release" />
+              <input type="hidden" id="cf-catalogue-id" />
+              <input type="hidden" id="cf-catalogue-type" />
+              <div id="cf-release-results" style="display:none;margin-top:6px;max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);"></div>
             </div>
 
             <div class="contract-form-field">
@@ -2756,6 +2758,31 @@
       });
     }
 
+    function assetLookupKeysForRelease(releaseLike) {
+      const keys = [];
+      function pushKey(value) {
+        const normalized = String(value || '').trim();
+        if (!normalized || keys.indexOf(normalized) !== -1) return;
+        keys.push(normalized);
+      }
+      const matchedRelease = (releaseLike && typeof releaseLike === 'object')
+        ? releaseLike
+        : (currentReleasesData || []).find(function(row) { return String(row.id) === String(releaseLike); }) || null;
+      if (matchedRelease && matchedRelease.catalogue_id) pushKey(matchedRelease.catalogue_id);
+      if (matchedRelease && matchedRelease.id) pushKey(matchedRelease.id);
+      if (!matchedRelease) pushKey(releaseLike);
+      return keys;
+    }
+
+    function getCachedAssetsForRelease(releaseLike) {
+      const lookupKeys = assetLookupKeysForRelease(releaseLike);
+      for (let i = 0; i < lookupKeys.length; i += 1) {
+        const cached = allAssetsCache[String(lookupKeys[i])];
+        if (cached) return cached;
+      }
+      return null;
+    }
+
     function releaseTitleForId(releaseId) {
       return releaseId ? (currentReleaseMap[String(releaseId)] || '') : '';
     }
@@ -2794,6 +2821,8 @@
     const LABEL_CATALOGUE_STORAGE_KEY = 'label_catalogue';
     const PUBLISHING_CATALOGUE_STORAGE_KEY = 'publishing_catalogue';
     const PIPELINE_REFERENCE_STORAGE_KEY = 'catalogue_pipeline_links';
+    let labelCatalogueData = [];
+    let publishingCatalogueData = [];
 
     function lsReadArray(key) {
       try {
@@ -2812,29 +2841,45 @@
       return String(v == null ? '' : v).trim();
     }
 
+    function normalizeLabelCatalogueRow(row) {
+      return {
+        id: catalogueNormalizeText(row && row.id),
+        artist: catalogueNormalizeText(row && row.artist),
+        track_title: catalogueNormalizeText(row && row.track_title),
+        version: catalogueNormalizeText(row && row.version),
+        release_title: catalogueNormalizeText(row && row.release_title),
+        isrc: catalogueNormalizeText(row && row.isrc)
+      };
+    }
+
+    function normalizePublishingCatalogueRow(row) {
+      return {
+        id: catalogueNormalizeText(row && row.id),
+        work_title: catalogueNormalizeText(row && row.work_title),
+        writers: catalogueNormalizeText(row && row.writers),
+        tempo_id: catalogueNormalizeText(row && row.tempo_id),
+        iswc: catalogueNormalizeText(row && row.iswc)
+      };
+    }
+
     function getLabelCatalogueRows() {
-      return lsReadArray(LABEL_CATALOGUE_STORAGE_KEY).map(function(row) {
-        return {
-          id: catalogueNormalizeText(row && row.id),
-          artist: catalogueNormalizeText(row && row.artist),
-          track_title: catalogueNormalizeText(row && row.track_title),
-          version: catalogueNormalizeText(row && row.version),
-          release_title: catalogueNormalizeText(row && row.release_title),
-          isrc: catalogueNormalizeText(row && row.isrc)
-        };
-      }).filter(function(row) { return row.id; });
+      return (labelCatalogueData || []).slice();
     }
 
     function getPublishingCatalogueRows() {
-      return lsReadArray(PUBLISHING_CATALOGUE_STORAGE_KEY).map(function(row) {
-        return {
-          id: catalogueNormalizeText(row && row.id),
-          work_title: catalogueNormalizeText(row && row.work_title),
-          writers: catalogueNormalizeText(row && row.writers),
-          tempo_id: catalogueNormalizeText(row && row.tempo_id),
-          iswc: catalogueNormalizeText(row && row.iswc)
-        };
-      }).filter(function(row) { return row.id; });
+      return (publishingCatalogueData || []).slice();
+    }
+
+    async function fetchCatalogueLookupData() {
+      if (!db) return;
+      const [labelRes, publishingRes] = await Promise.all([
+        db.from('label_catalogue').select('id,artist,track_title,version,release_title,isrc').order('artist', { ascending: true }).limit(5000),
+        db.from('publishing_catalogue').select('id,work_title,writers,tempo_id,iswc').order('work_title', { ascending: true }).limit(5000)
+      ]);
+      if (labelRes.error) throw labelRes.error;
+      if (publishingRes.error) throw publishingRes.error;
+      labelCatalogueData = (labelRes.data || []).map(normalizeLabelCatalogueRow).filter(function(row) { return row.id; });
+      publishingCatalogueData = (publishingRes.data || []).map(normalizePublishingCatalogueRow).filter(function(row) { return row.id; });
     }
 
     function getPipelineReferenceEntries() {
@@ -2860,7 +2905,9 @@
       const type = catalogueNormalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
       const id = catalogueNormalizeText(catalogueId);
       const rows = type === 'publishing' ? getPublishingCatalogueRows() : getLabelCatalogueRows();
-      return rows.find(function(row) { return row.id === id; }) || null;
+      const found = rows.find(function(row) { return String(row.id) === String(id); }) || null;
+      console.log('[Pipeline Catalogue Lookup]', { catalogue_type: type, catalogue_id: id, lookup_result: found ? found.id : null });
+      return found;
     }
 
     function pipelineEntryExistsForCatalogue(catalogueType, catalogueId) {
@@ -3122,8 +3169,7 @@
     function boolCell(val){ if(val===true)return'<span class="bool-yes">✓ Yes</span>'; if(val===false)return'<span class="bool-no">✗ No</span>'; return'<span class="bool-na">—</span>'; }
 
     function assetsCompleteCell(releaseId) {
-      const rid = String(releaseId);
-      const assets = allAssetsCache[rid];
+      const assets = getCachedAssetsForRelease(releaseId);
       if (!assets) return '<span class="bool-na" title="Open Assets Checklist for this release to compute">—</span>';
 
       const comp = computeCompletion(assets);
@@ -3291,6 +3337,7 @@
     async function fetchReleases() {
       relShowLoading();
       try {
+        await fetchCatalogueLookupData();
         const pipelineRows = getPipelineReferenceEntries().map(buildPipelineReferenceRow);
         dbg.fetchStatus('Loaded from catalogue references','debug-ok');
         dbg.rowCount(String(pipelineRows.length), pipelineRows.length>0?'debug-ok':'debug-warn');
@@ -3319,7 +3366,7 @@
             : (rawId.length > 12 ? rawId.substring(0, 8) + '…' : rawId || '—');
 
           // v26: role-aware completion — use cached assets if available
-          const cachedAssets = allAssetsCache[String(r.id)] || null;
+          const cachedAssets = getCachedAssetsForRelease(r);
           const completionCell = roleCompletionCell(r, cachedAssets);
           const releaseIdStr = String(r.id);
           const checkedAttr = selectedReleaseIds.has(releaseIdStr) ? ' checked' : '';
@@ -3447,37 +3494,44 @@
       }
     }
 
-    async function fetchAssetsForRelease(releaseId) {
+    async function fetchAssetsForRelease(releaseLike) {
       dbgA.fetchStatus('Fetching…','debug-warn'); dbgA.rowCount('—'); dbgA.fetchError('');
       elAssetsLoadStatus.textContent = 'Loading…';
       elAssetsError.style.display = 'none';
       if (!db) {
         dbgA.fetchStatus('Error','debug-error'); dbgA.fetchError('Supabase not initialised');
         elAssetsError.textContent = '⚠ Supabase not initialised.'; elAssetsError.style.display = 'block';
-        elAssetsLoadStatus.textContent = ''; return [];
+        elAssetsLoadStatus.textContent = ''; return { rows: [], resolvedReleaseId: '' };
       }
+      const lookupKeys = assetLookupKeysForRelease(releaseLike);
+      const fallbackKey = lookupKeys[0] || String(releaseLike || '');
       try {
-        const { data, error } = await db
+        let query = db
           .from('assets')
-          .select('id,release_id,area,asset_title,dropbox_url,received,required,sort_order')
-          .eq('release_id', releaseId)
+          .select('id,release_id,area,asset_title,dropbox_url,received,required,sort_order');
+        if (lookupKeys.length > 1) query = query.in('release_id', lookupKeys);
+        else query = query.eq('release_id', fallbackKey);
+        const { data, error } = await query
           .order('sort_order', { ascending: true, nullsFirst: false })
           .order('id',         { ascending: true });
 
         if (error) {
           dbgA.fetchStatus('Error','debug-error'); dbgA.fetchError(error.message);
           elAssetsError.textContent = '⚠ Failed: '+error.message; elAssetsError.style.display = 'block';
-          elAssetsLoadStatus.textContent = ''; return [];
+          elAssetsLoadStatus.textContent = ''; return { rows: [], resolvedReleaseId: fallbackKey };
         }
 
+        const resolvedReleaseId = lookupKeys.find(function(key) {
+          return (data || []).some(function(row) { return String(row.release_id) === String(key); });
+        }) || fallbackKey;
         dbgA.fetchStatus('Success','debug-ok');
         dbgA.rowCount(String(data.length), data.length>0?'debug-ok':'debug-warn');
         dbgA.fetchError(''); elAssetsLoadStatus.textContent = '';
-        return data;
+        return { rows: data || [], resolvedReleaseId: resolvedReleaseId };
       } catch(err) {
         dbgA.fetchStatus('Error','debug-error'); dbgA.fetchError(err.message);
         elAssetsError.textContent = '⚠ Unexpected: '+err.message; elAssetsError.style.display = 'block';
-        elAssetsLoadStatus.textContent = ''; return [];
+        elAssetsLoadStatus.textContent = ''; return { rows: [], resolvedReleaseId: fallbackKey };
       }
     }
 
@@ -3683,8 +3737,9 @@
             selectedAssetKeys.delete(selectionKey);
             row.remove();
           }
-          currentAssets = await fetchAssetsForRelease(releaseId);
-          allAssetsCache[String(releaseId)] = currentAssets;
+          const refreshedAssets = await fetchAssetsForRelease(releaseId);
+          currentAssets = refreshedAssets.rows;
+          if (refreshedAssets.resolvedReleaseId) allAssetsCache[String(refreshedAssets.resolvedReleaseId)] = currentAssets;
           refreshGroupProgressFromDOM(group);
           refreshPipelineAssetCells();
         } catch(err) {
@@ -3859,22 +3914,21 @@
     // Load checklist for selected release
     async function loadAssetsChecklist(selectedValue) {
       // v19: retrieve the exact id from the map (catches any string→value issues)
-      const releaseId = releaseIdMap[String(selectedValue)] !== undefined
+      const selectedReleaseId = releaseIdMap[String(selectedValue)] !== undefined
         ? releaseIdMap[String(selectedValue)]
         : selectedValue;   // fallback: use as-is if not in map (should not happen)
-
-      // Show the exact release_id being used in the debug panel
-      dbgA.releaseId(String(releaseId));
 
       elAssetsPlaceholder.style.display = 'none';
       elAssetsError.style.display       = 'none';
       elAssetsChecklist.innerHTML       = '<p class="assets-status-msg">Loading checklist…</p>';
       selectedAssetKeys.clear();
-      currentReleaseId = releaseId;
-      currentAssets    = await fetchAssetsForRelease(releaseId);
-      allAssetsCache[String(releaseId)] = currentAssets;
+      const assetFetch = await fetchAssetsForRelease(selectedReleaseId);
+      currentReleaseId = assetFetch.resolvedReleaseId || String(selectedReleaseId || '');
+      dbgA.releaseId(String(currentReleaseId));
+      currentAssets    = assetFetch.rows;
+      if (currentReleaseId) allAssetsCache[String(currentReleaseId)] = currentAssets;
       refreshPipelineAssetCells();
-      renderChecklist(releaseId, currentAssets, currentActiveArea);
+      renderChecklist(currentReleaseId, currentAssets, currentActiveArea);
     }
 
     // Release selector
@@ -3921,7 +3975,7 @@
         for (const row of rows) {
           const existingId = row.dataset.assetId || null;
           const area = row.dataset.area || '';
-          const nameInput = row.querySelector('.asset-name input');
+          const nameInput = row.querySelector('.asset-name input[type="text"]');
           const urlInput = row.querySelector('.asset-dropbox input');
           const recvChk = row.querySelector('.asset-received input[type="checkbox"]');
           const reqChk = row.querySelector('.asset-required input[type="checkbox"]');
@@ -3943,8 +3997,10 @@
           );
           if (!existingId && newId) row.dataset.assetId = String(newId);
         }
-        currentAssets = await fetchAssetsForRelease(currentReleaseId);
-        allAssetsCache[String(currentReleaseId)] = currentAssets;
+        const refreshedAssets = await fetchAssetsForRelease(currentReleaseId);
+        currentAssets = refreshedAssets.rows;
+        if (refreshedAssets.resolvedReleaseId) currentReleaseId = refreshedAssets.resolvedReleaseId;
+        if (currentReleaseId) allAssetsCache[String(currentReleaseId)] = currentAssets;
         refreshPipelineAssetCells();
         renderChecklist(currentReleaseId, currentAssets, currentActiveArea);
         elAssetsLoadStatus.textContent = 'Checklist saved';
@@ -3983,6 +4039,10 @@
     // Form field refs
     const cfTitle       = document.getElementById('cf-title');
     const cfRelease     = document.getElementById('cf-release');
+    const cfReleaseSearch = document.getElementById('cf-release-search');
+    const cfReleaseResults = document.getElementById('cf-release-results');
+    const cfCatalogueId = document.getElementById('cf-catalogue-id');
+    const cfCatalogueType = document.getElementById('cf-catalogue-type');
     const cfStatus      = document.getElementById('cf-status');
     const cfDateSent    = document.getElementById('cf-date-sent');
     const cfDateRecv    = document.getElementById('cf-date-received');
@@ -4230,18 +4290,78 @@
 
     let allContracts = [];
     let contractsFilter = 'all';
+    let contractCatalogueOptions = [];
+
+    function contractCatalogueLabel(item) {
+      if (!item) return '';
+      return item.catalogue_type === 'publishing'
+        ? ((item.work_title || '—') + (item.writers ? (' — ' + item.writers) : ''))
+        : ((item.artist || '—') + (item.track_title ? (' — ' + item.track_title) : ''));
+    }
+
+    async function fetchContractCatalogueOptions() {
+      if (!db) return [];
+      await fetchCatalogueLookupData();
+      contractCatalogueOptions = []
+        .concat((labelCatalogueData || []).map(function(row) {
+          return { catalogue_id: String(row.id), catalogue_type: 'label', artist: row.artist || '', track_title: row.track_title || '' };
+        }))
+        .concat((publishingCatalogueData || []).map(function(row) {
+          return { catalogue_id: String(row.id), catalogue_type: 'publishing', work_title: row.work_title || '', writers: row.writers || '' };
+        }));
+      return contractCatalogueOptions;
+    }
+
+    function clearContractCatalogueSelection() {
+      if (cfRelease) cfRelease.value = '';
+      if (cfCatalogueId) cfCatalogueId.value = '';
+      if (cfCatalogueType) cfCatalogueType.value = '';
+      if (cfReleaseSearch) cfReleaseSearch.value = '';
+      if (cfReleaseResults) {
+        cfReleaseResults.innerHTML = '';
+        cfReleaseResults.style.display = 'none';
+      }
+    }
+
+    function setContractCatalogueSelection(item) {
+      if (!item) { clearContractCatalogueSelection(); return; }
+      if (cfCatalogueId) cfCatalogueId.value = item.catalogue_id || '';
+      if (cfCatalogueType) cfCatalogueType.value = item.catalogue_type || '';
+      if (cfRelease) cfRelease.value = item.catalogue_id || '';
+      if (cfReleaseSearch) cfReleaseSearch.value = contractCatalogueLabel(item);
+      if (cfReleaseResults) {
+        cfReleaseResults.innerHTML = '';
+        cfReleaseResults.style.display = 'none';
+      }
+    }
+
+    function renderContractCatalogueResults(term) {
+      if (!cfReleaseResults) return;
+      const query = String(term || '').trim().toLowerCase();
+      const rows = (contractCatalogueOptions || []).filter(function(item) {
+        if (!query) return true;
+        return contractCatalogueLabel(item).toLowerCase().includes(query);
+      }).slice(0, 50);
+      cfReleaseResults.innerHTML = '';
+      if (!rows.length) {
+        cfReleaseResults.style.display = query ? 'block' : 'none';
+        if (query) cfReleaseResults.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--muted);">No catalogue matches.</div>';
+        return;
+      }
+      rows.forEach(function(item) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-ghost';
+        btn.style.cssText = 'display:block;width:100%;text-align:left;padding:10px 12px;border:none;border-bottom:1px solid var(--border);border-radius:0;background:transparent;';
+        btn.textContent = contractCatalogueLabel(item);
+        btn.addEventListener('click', function() { setContractCatalogueSelection(item); });
+        cfReleaseResults.appendChild(btn);
+      });
+      cfReleaseResults.style.display = 'block';
+    }
 
     function populateContractReleaseDropdown(releasesData) {
-      const selected = cfRelease.value;
-      while (cfRelease.options.length > 1) cfRelease.remove(1);
-      (releasesData||[]).forEach(function(r) {
-        const opt = document.createElement('option');
-        opt.value = String(r.id); opt.textContent = pipelineDisplayName(r);
-        cfRelease.appendChild(opt);
-      });
-      if (selected && Array.from(cfRelease.options).some(function(opt) { return opt.value === selected; })) {
-        cfRelease.value = selected;
-      }
+      if (cfReleaseResults) cfReleaseResults.style.display = 'none';
     }
 
     function contractStatusBadge(status) {
@@ -4262,7 +4382,7 @@
     function resetContractForm() {
       cfId.value = '';
       cfTitle.value = '';
-      cfRelease.value = '';
+      clearContractCatalogueSelection();
       cfStatus.value = 'Draft';
       setDateInputValue(cfDateSent, '');
       setDateInputValue(cfDateRecv, '');
@@ -4298,7 +4418,24 @@
     function editContract(c) {
       cfId.value         = String(c.id);
       cfTitle.value      = c.title || '';
-      cfRelease.value    = c.release_id ? String(c.release_id) : '';
+      if (c.catalogue_id && c.catalogue_type) {
+        setContractCatalogueSelection({
+          catalogue_id: String(c.catalogue_id),
+          catalogue_type: String(c.catalogue_type),
+          artist: c.artist || '',
+          track_title: c.title || '',
+          work_title: c.title || '',
+          writers: c.artist || ''
+        });
+        const match = (contractCatalogueOptions || []).find(function(item) {
+          return String(item.catalogue_id) === String(c.catalogue_id) && String(item.catalogue_type) === String(c.catalogue_type);
+        });
+        if (match) setContractCatalogueSelection(match);
+      } else {
+        clearContractCatalogueSelection();
+        if (cfRelease) cfRelease.value = c.release_id ? String(c.release_id) : '';
+        if (cfReleaseSearch) cfReleaseSearch.value = c.release_id ? (releaseTitleForId(c.release_id) || String(c.release_id)) : '';
+      }
       cfStatus.value     = c.status || 'Draft';
       setDateInputValue(cfDateSent, c.date_sent);
       setDateInputValue(cfDateRecv, c.date_received);
@@ -4361,6 +4498,7 @@
           elContractsError.style.display = 'block';
           return;
         }
+        await fetchContractCatalogueOptions();
         allContracts = (data || []).map(function(c) {
           return Object.assign({}, c, {
             participates_in_royalties: contractParticipatesInRoyalties(c)
@@ -4476,6 +4614,17 @@
       return '—';
     }
 
+    function contractLinkedReleaseLabel(c) {
+      if (c && c.catalogue_id && c.catalogue_type) {
+        const match = (contractCatalogueOptions || []).find(function(item) {
+          return String(item.catalogue_id) === String(c.catalogue_id) && String(item.catalogue_type) === String(c.catalogue_type);
+        });
+        if (match) return contractCatalogueLabel(match);
+        return (String(c.catalogue_type) === 'publishing' ? 'Publishing' : 'Label') + ' catalogue item';
+      }
+      return c && c.release_id ? (releaseTitleForId(c.release_id) || String(c.release_id)) : '';
+    }
+
     function renderContractsTable() {
       const searchTerm = (elContractSearch.value || '').toLowerCase();
       const rows = allContracts.filter(function(c) {
@@ -4488,7 +4637,7 @@
             c.sending_party || '',
             c.notes || '',
             c.status || '',
-            releaseTitleForId(c.release_id),
+            contractLinkedReleaseLabel(c),
             payeesSummary(c)
           ].join(' ').toLowerCase();
           if (!hay.includes(searchTerm)) return false;
@@ -4513,9 +4662,7 @@
 
       elContractsTbody.innerHTML = '';
       rows.forEach(function(c) {
-      const relTitle = c.release_id
-          ? (releaseTitleForId(c.release_id) || String(c.release_id))
-          : '<span class="no-release-warn">⚠ No release linked</span>';
+      const relTitle = contractLinkedReleaseLabel(c) || '<span class="no-release-warn">⚠ No release linked</span>';
         const ne = escapeHtml(c.notes || '');
         const payeesText = payeesSummary(c);
         const participates = contractParticipatesInRoyalties(c);
@@ -4534,7 +4681,7 @@
           '<td><input type="checkbox" data-contract-select="' + contractIdStr + '"' + checkedAttr + ' aria-label="Select contract" /></td>'+
           '<td><strong>'+escapeHtml(c.title||'—')+'</strong></td>'+
           '<td>'+escapeHtml(c.contract_type||'—')+nonRoyaltyChip+'</td>'+
-          '<td>'+(c.release_id ? escapeHtml(releaseTitleForId(c.release_id) || String(c.release_id)) : relTitle)+'</td>'+
+          '<td>'+ (relTitle.indexOf('<span') === 0 ? relTitle : escapeHtml(relTitle)) +'</td>'+
           '<td>'+contractStatusBadge(c.status)+'</td>'+
           '<td style="font-size:12px;">'+escapeHtml(c.sending_party||'—')+'</td>'+
           '<td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHtml(payeesText||'—')+'">'+(contractNeedsRoyaltyShares(c) ? escapeHtml(payeesText||'—') : '—')+'</td>'+
@@ -4596,7 +4743,9 @@
       const payload = {
         title:               title,
         contract_type:       typeCombo.getValue() || null,
-        release_id:          cfRelease.value || null,
+        release_id:          cfCatalogueId && cfCatalogueId.value ? null : (cfRelease.value || null),
+        catalogue_id:        cfCatalogueId ? (cfCatalogueId.value || null) : null,
+        catalogue_type:      cfCatalogueType ? (cfCatalogueType.value || null) : null,
         status:              cfStatus.value || 'Draft',
         sending_party:       senderCombo.getValue() || null,
         parties:             partiesStr,
@@ -4647,6 +4796,32 @@
     document.getElementById('contracts-add-btn').addEventListener('click', function() { resetContractForm(); showContractForm(); });
     document.getElementById('contract-cancel-btn').addEventListener('click', hideContractForm);
     elContractSearch.addEventListener('input', function() { renderContractsTable(); });
+    if (cfReleaseSearch) {
+      cfReleaseSearch.addEventListener('focus', async function() {
+        try {
+          if (!contractCatalogueOptions.length) await fetchContractCatalogueOptions();
+          renderContractCatalogueResults(cfReleaseSearch.value || '');
+        } catch (err) {
+          setContractFeedback('⚠ Failed to load catalogue search.', 'error');
+        }
+      });
+      cfReleaseSearch.addEventListener('input', async function() {
+        if (cfCatalogueId) cfCatalogueId.value = '';
+        if (cfCatalogueType) cfCatalogueType.value = '';
+        if (cfRelease) cfRelease.value = '';
+        try {
+          if (!contractCatalogueOptions.length) await fetchContractCatalogueOptions();
+          renderContractCatalogueResults(cfReleaseSearch.value || '');
+        } catch (err) {
+          setContractFeedback('⚠ Failed to search catalogue.', 'error');
+        }
+      });
+    }
+    document.addEventListener('click', function(e) {
+      if (!cfReleaseResults || !cfReleaseSearch) return;
+      if (cfReleaseResults.contains(e.target) || e.target === cfReleaseSearch) return;
+      cfReleaseResults.style.display = 'none';
+    });
     document.querySelectorAll('.filter-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -5454,8 +5629,14 @@
         }
         selectedAssetKeys.delete(key);
       }
-      currentAssets = currentReleaseId ? await fetchAssetsForRelease(currentReleaseId) : [];
-      if (currentReleaseId) allAssetsCache[String(currentReleaseId)] = currentAssets;
+      if (currentReleaseId) {
+        const refreshedAssets = await fetchAssetsForRelease(currentReleaseId);
+        currentAssets = refreshedAssets.rows;
+        if (refreshedAssets.resolvedReleaseId) currentReleaseId = refreshedAssets.resolvedReleaseId;
+        allAssetsCache[String(currentReleaseId)] = currentAssets;
+      } else {
+        currentAssets = [];
+      }
       if (currentReleaseId) renderChecklist(currentReleaseId, currentAssets, currentActiveArea);
       refreshPipelineAssetCells();
     }
@@ -7366,6 +7547,7 @@ Best regards`;
     (async function boot() {
       // Load assets cache FIRST so pipeline completion shows correctly on first render
       await fetchAllAssetsCache();
+      await fetchCatalogueLookupData();
       const releasesData = await fetchReleases();
       currentReleasesData = releasesData || [];
       refreshReleaseMap(currentReleasesData);

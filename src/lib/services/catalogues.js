@@ -210,12 +210,57 @@ export async function fetchPublishingCatalogue() {
   return publishingCatalogueCache.slice();
 }
 
+export async function createLabelCatalogueRow(values) {
+  const db = getSupabaseClient();
+  const payload = {
+    artist: normalizeText(values && values.artist),
+    track_title: normalizeText(values && values.track_title),
+    version: normalizeText(values && values.version) || null,
+    release_title: normalizeText(values && values.release_title) || null,
+    isrc: normalizeText(values && values.isrc) || null
+  };
+  const { data, error } = await db
+    .from('label_catalogue')
+    .insert(payload)
+    .select('id, artist, track_title, version, release_title, isrc')
+    .single();
+  if (error) throw error;
+  const normalized = normalizeLabelRow(data || payload);
+  labelCatalogueCache = [normalized].concat(labelCatalogueCache.filter((row) => row.id !== normalized.id));
+  return normalized;
+}
+
+export async function createPublishingCatalogueRow(values) {
+  const db = getSupabaseClient();
+  const payload = {
+    work_title: normalizeText(values && values.work_title),
+    writers: normalizeText(values && values.writers) || null,
+    tempo_id: normalizeText(values && values.tempo_id) || null,
+    iswc: normalizeText(values && values.iswc) || null
+  };
+  const { data, error } = await db
+    .from('publishing_catalogue')
+    .insert(payload)
+    .select('id, work_title, writers, tempo_id, iswc')
+    .single();
+  if (error) throw error;
+  const normalized = normalizePublishingRow(data || payload);
+  publishingCatalogueCache = [normalized].concat(publishingCatalogueCache.filter((row) => row.id !== normalized.id));
+  return normalized;
+}
+
 export async function deleteLabelCatalogueRows(ids) {
   const rowIds = Array.from(ids || []).map((id) => normalizeText(id)).filter(Boolean);
   if (!rowIds.length) return 0;
   const db = getSupabaseClient();
-  const { error } = await db.from('label_catalogue').delete().in('id', rowIds);
-  if (error) throw error;
+  const query = rowIds.length === 1
+    ? db.from('label_catalogue').delete().eq('id', rowIds[0])
+    : db.from('label_catalogue').delete().in('id', rowIds);
+  const { error } = await query;
+  if (error) {
+    console.error('[Catalogue Delete] label_catalogue delete failed:', error);
+    throw error;
+  }
   labelCatalogueCache = labelCatalogueCache.filter((row) => !rowIds.includes(row.id));
   return rowIds.length;
 }
@@ -224,8 +269,14 @@ export async function deletePublishingCatalogueRows(ids) {
   const rowIds = Array.from(ids || []).map((id) => normalizeText(id)).filter(Boolean);
   if (!rowIds.length) return 0;
   const db = getSupabaseClient();
-  const { error } = await db.from('publishing_catalogue').delete().in('id', rowIds);
-  if (error) throw error;
+  const query = rowIds.length === 1
+    ? db.from('publishing_catalogue').delete().eq('id', rowIds[0])
+    : db.from('publishing_catalogue').delete().in('id', rowIds);
+  const { error } = await query;
+  if (error) {
+    console.error('[Catalogue Delete] publishing_catalogue delete failed:', error);
+    throw error;
+  }
   publishingCatalogueCache = publishingCatalogueCache.filter((row) => !rowIds.includes(row.id));
   return rowIds.length;
 }

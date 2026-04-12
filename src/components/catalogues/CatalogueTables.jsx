@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ScreenHeader from '@/components/ScreenHeader';
 import {
+  createLabelCatalogueRow,
+  createPublishingCatalogueRow,
   createCataloguePipelineEntry,
   deleteLabelCatalogueRows,
   deletePublishingCatalogueRows,
@@ -13,19 +15,66 @@ import {
   parseCatalogueFilePreview
 } from '@/lib/services/catalogues';
 
-function CatalogueActions({ importType, onTypeChange, onImport }) {
+function CatalogueActions({ importType, onTypeChange, onImport, onAddNew, disabled }) {
   return (
     <>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" className={`shell-btn${importType === 'label' ? ' shell-btn-primary' : ''}`} onClick={() => onTypeChange('label')}>
+        <button type="button" className={`shell-btn${importType === 'label' ? ' shell-btn-primary' : ''}`} onClick={() => onTypeChange('label')} disabled={disabled}>
           Label Catalogue
         </button>
-        <button type="button" className={`shell-btn${importType === 'publishing' ? ' shell-btn-primary' : ''}`} onClick={() => onTypeChange('publishing')}>
+        <button type="button" className={`shell-btn${importType === 'publishing' ? ' shell-btn-primary' : ''}`} onClick={() => onTypeChange('publishing')} disabled={disabled}>
           Publishing Catalogue
         </button>
       </div>
-      <button type="button" className="shell-btn shell-btn-primary" onClick={onImport}>Import Catalogue</button>
+      <button type="button" className="shell-btn" onClick={onAddNew} disabled={disabled}>Add New</button>
+      <button type="button" className="shell-btn shell-btn-primary" onClick={onImport} disabled={disabled}>
+        {disabled ? 'Loading…' : 'Import Catalogue'}
+      </button>
     </>
+  );
+}
+
+function ManualEntryForm({ type, values, onChange, onSave, onCancel, saving }) {
+  const fields = type === 'publishing'
+    ? [
+        ['work_title', 'Work Title *'],
+        ['writers', 'Writers'],
+        ['tempo_id', 'Tempo ID'],
+        ['iswc', 'ISWC']
+      ]
+    : [
+        ['artist', 'Artist *'],
+        ['track_title', 'Track Title *'],
+        ['version', 'Version'],
+        ['release_title', 'Release Title'],
+        ['isrc', 'ISRC']
+      ];
+
+  return (
+    <div className="module-card">
+      <div className="module-card-head">
+        <h3>{type === 'publishing' ? 'Add Publishing Catalogue Row' : 'Add Label Catalogue Row'}</h3>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        {fields.map(([key, label]) => (
+          <label key={key} style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+            <span style={{ fontWeight: 600 }}>{label}</span>
+            <input
+              type="text"
+              value={values[key] || ''}
+              onChange={(event) => onChange(key, event.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+            />
+          </label>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+        <button type="button" className="shell-btn shell-btn-primary" onClick={onSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button type="button" className="shell-btn" onClick={onCancel} disabled={saving}>Cancel</button>
+      </div>
+    </div>
   );
 }
 
@@ -97,7 +146,10 @@ function CatalogueTable({
   onToggleRow,
   onAdd,
   onDeleteRow,
-  onDeleteSelected
+  onDeleteSelected,
+  deleting,
+  search,
+  onSearchChange
 }) {
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
 
@@ -107,10 +159,21 @@ function CatalogueTable({
         <h3>{type === 'publishing' ? 'Publishing Catalogue' : 'Label Catalogue'}</h3>
         <span className="count-pill">{rows.length}</span>
       </div>
+      <div style={{ marginBottom: 12 }}>
+        <input
+          type="text"
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder={type === 'publishing' ? 'Search title or writer…' : 'Search artist or title…'}
+          style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+        />
+      </div>
       {selectedIds.size ? (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>{selectedIds.size} selected</span>
-          <button type="button" className="shell-btn" onClick={onDeleteSelected}>Delete Selected</button>
+          <button type="button" className="shell-btn" onClick={onDeleteSelected} disabled={deleting}>
+            {deleting ? 'Deleting…' : 'Delete Selected'}
+          </button>
         </div>
       ) : null}
       {rows.length ? (
@@ -184,8 +247,9 @@ function CatalogueTable({
                           type="button"
                           className="shell-btn"
                           onClick={() => onDeleteRow(row.id)}
+                          disabled={deleting}
                         >
-                          Delete
+                          {deleting ? 'Deleting…' : 'Delete'}
                         </button>
                       </div>
                     </td>
@@ -214,24 +278,45 @@ export default function CatalogueTables() {
   const [preview, setPreview] = useState(null);
   const [mapping, setMapping] = useState({});
   const [importing, setImporting] = useState(false);
+  const [fetching, setFetching] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [savingManual, setSavingManual] = useState(false);
+  const [manualValues, setManualValues] = useState({});
 
   const visibleRows = useMemo(() => {
-    const next = rows.slice();
+    const lowered = search.trim().toLowerCase();
+    const next = rows.filter((row) => {
+      if (!lowered) return true;
+      if (activeType === 'publishing') {
+        return `${row.work_title || ''} ${row.writers || ''}`.toLowerCase().includes(lowered);
+      }
+      return `${row.artist || ''} ${row.track_title || ''}`.toLowerCase().includes(lowered);
+    }).slice();
     next.sort((a, b) => {
       if (activeType === 'publishing') return `${a.work_title} ${a.writers}`.localeCompare(`${b.work_title} ${b.writers}`);
       return `${a.artist} ${a.track_title}`.localeCompare(`${b.artist} ${b.track_title}`);
     });
     return next;
-  }, [rows, activeType]);
+  }, [rows, activeType, search]);
 
   async function loadActiveCatalogue(type = activeType) {
-    const nextRows = type === 'publishing' ? await fetchPublishingCatalogue() : await fetchLabelCatalogue();
-    setRows(nextRows);
-    setLinkedIds(new Set(nextRows.filter((row) => hasPipelineLink(type, row.id)).map((row) => row.id)));
-    setSelectedIds(new Set());
+    setFetching(true);
+    try {
+      const nextRows = type === 'publishing' ? await fetchPublishingCatalogue() : await fetchLabelCatalogue();
+      setRows(nextRows);
+      setLinkedIds(new Set(nextRows.filter((row) => hasPipelineLink(type, row.id)).map((row) => row.id)));
+      setSelectedIds(new Set());
+    } finally {
+      setFetching(false);
+    }
   }
 
   useEffect(() => {
+    setSearch('');
+    setShowAddForm(false);
+    setManualValues({});
     loadActiveCatalogue(activeType).catch((err) => {
       setError(err.message || 'Failed to load catalogue.');
     });
@@ -266,11 +351,11 @@ export default function CatalogueTables() {
     try {
       const result = await importMappedCatalogueRows(activeType, preview.headers, preview.rows, mapping);
       await loadActiveCatalogue(activeType);
-      setMessage(`Parsed ${result.parsedCount} rows. Imported ${result.insertedCount} rows.`);
+      setMessage(`Import successful. Parsed ${result.parsedCount} rows. Imported ${result.insertedCount} rows.`);
       setPreview(null);
       setMapping({});
     } catch (err) {
-      setError(err.message || 'Failed to import catalogue.');
+      setError(err.message || 'Import failed.');
     } finally {
       setImporting(false);
     }
@@ -280,6 +365,33 @@ export default function CatalogueTables() {
     setPreview(null);
     setMapping({});
     setError('');
+  }
+
+  function handleManualChange(field, value) {
+    setManualValues((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleSaveManual() {
+    setError('');
+    setMessage('');
+    setSavingManual(true);
+    try {
+      if (activeType === 'publishing') {
+        if (!String(manualValues.work_title || '').trim()) throw new Error('Work Title is required.');
+        await createPublishingCatalogueRow(manualValues);
+      } else {
+        if (!String(manualValues.artist || '').trim() || !String(manualValues.track_title || '').trim()) throw new Error('Artist and Track Title are required.');
+        await createLabelCatalogueRow(manualValues);
+      }
+      await loadActiveCatalogue(activeType);
+      setShowAddForm(false);
+      setManualValues({});
+      setMessage('Added new catalogue row.');
+    } catch (err) {
+      setError(err.message || 'Failed to add catalogue row.');
+    } finally {
+      setSavingManual(false);
+    }
   }
 
   async function handleAddToPipeline(row) {
@@ -309,13 +421,18 @@ export default function CatalogueTables() {
     if (!confirm(`Delete ${rowIds.length} ${rowIds.length === 1 ? 'row' : 'rows'}?`)) return;
     setError('');
     setMessage('');
+    setDeleting(true);
     try {
-      if (activeType === 'publishing') await deletePublishingCatalogueRows(rowIds);
-      else await deleteLabelCatalogueRows(rowIds);
+      const deletedCount = activeType === 'publishing'
+        ? await deletePublishingCatalogueRows(rowIds)
+        : await deleteLabelCatalogueRows(rowIds);
       await loadActiveCatalogue(activeType);
-      setMessage(`Deleted ${rowIds.length} ${rowIds.length === 1 ? 'row' : 'rows'}.`);
+      setMessage(`Deleted ${deletedCount} rows`);
     } catch (err) {
-      setError(err.message || 'Failed to delete catalogue rows.');
+      console.error('[Catalogue Delete] UI delete failed:', err);
+      setError(err.message || 'Delete failed.');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -337,11 +454,22 @@ export default function CatalogueTables() {
       <ScreenHeader
         title="Catalogues"
         subtitle="Dedicated catalogue views for label and publishing records."
-        actions={<CatalogueActions importType={activeType} onTypeChange={setActiveType} onImport={() => inputRef.current?.click()} />}
+        actions={<CatalogueActions importType={activeType} onTypeChange={setActiveType} onImport={() => inputRef.current?.click()} onAddNew={() => setShowAddForm(true)} disabled={fetching || importing || deleting || savingManual} />}
       />
       <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleImport} hidden />
+      {fetching ? <div className="module-card"><div className="loading-block">Loading…</div></div> : null}
       {message ? <div className="module-card"><div className="success-note">{message}</div></div> : null}
       {error ? <div className="module-card"><div className="empty-block">{error}</div></div> : null}
+      {showAddForm ? (
+        <ManualEntryForm
+          type={activeType}
+          values={manualValues}
+          onChange={handleManualChange}
+          onSave={handleSaveManual}
+          onCancel={() => { setShowAddForm(false); setManualValues({}); }}
+          saving={savingManual}
+        />
+      ) : null}
       {preview ? (
         <ImportPreview
           importType={activeType}
@@ -364,6 +492,9 @@ export default function CatalogueTables() {
         onAdd={handleAddToPipeline}
         onDeleteRow={(id) => handleDelete([id])}
         onDeleteSelected={() => handleDelete(Array.from(selectedIds))}
+        deleting={deleting}
+        search={search}
+        onSearchChange={setSearch}
       />
     </section>
   );
