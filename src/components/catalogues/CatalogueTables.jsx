@@ -12,7 +12,9 @@ import {
   fetchPublishingCatalogue,
   hasPipelineLink,
   importMappedCatalogueRows,
-  parseCatalogueFilePreview
+  parseCatalogueFilePreview,
+  updateLabelCatalogueRow,
+  updatePublishingCatalogueRow
 } from '@/lib/services/catalogues';
 
 function CatalogueActions({ importType, onTypeChange, onImport, onAddNew, disabled }) {
@@ -34,7 +36,7 @@ function CatalogueActions({ importType, onTypeChange, onImport, onAddNew, disabl
   );
 }
 
-function ManualEntryForm({ type, values, onChange, onSave, onCancel, saving }) {
+function ManualEntryForm({ type, values, onChange, onSave, onCancel, saving, mode }) {
   const fields = type === 'publishing'
     ? [
         ['work_title', 'Work Title *'],
@@ -53,7 +55,7 @@ function ManualEntryForm({ type, values, onChange, onSave, onCancel, saving }) {
   return (
     <div className="module-card">
       <div className="module-card-head">
-        <h3>{type === 'publishing' ? 'Add Publishing Catalogue Row' : 'Add Label Catalogue Row'}</h3>
+        <h3>{mode === 'edit' ? (type === 'publishing' ? 'Edit Publishing Catalogue Row' : 'Edit Label Catalogue Row') : (type === 'publishing' ? 'Add Publishing Catalogue Row' : 'Add Label Catalogue Row')}</h3>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
         {fields.map(([key, label]) => (
@@ -145,6 +147,7 @@ function CatalogueTable({
   onToggleAll,
   onToggleRow,
   onAdd,
+  onEditRow,
   onDeleteRow,
   onDeleteSelected,
   deleting,
@@ -246,6 +249,14 @@ function CatalogueTable({
                         <button
                           type="button"
                           className="shell-btn"
+                          onClick={() => onEditRow(row)}
+                          disabled={deleting || isBusy}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="shell-btn"
                           onClick={() => onDeleteRow(row.id)}
                           disabled={deleting}
                         >
@@ -284,6 +295,7 @@ export default function CatalogueTables() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
   const [manualValues, setManualValues] = useState({});
+  const [editingRowId, setEditingRowId] = useState('');
 
   const visibleRows = useMemo(() => {
     const lowered = search.trim().toLowerCase();
@@ -317,6 +329,7 @@ export default function CatalogueTables() {
     setSearch('');
     setShowAddForm(false);
     setManualValues({});
+    setEditingRowId('');
     loadActiveCatalogue(activeType).catch((err) => {
       setError(err.message || 'Failed to load catalogue.');
     });
@@ -376,22 +389,67 @@ export default function CatalogueTables() {
     setMessage('');
     setSavingManual(true);
     try {
-      if (activeType === 'publishing') {
-        if (!String(manualValues.work_title || '').trim()) throw new Error('Work Title is required.');
-        await createPublishingCatalogueRow(manualValues);
+      if (editingRowId) {
+        if (activeType === 'publishing') {
+          if (!String(manualValues.work_title || '').trim()) throw new Error('Work Title is required.');
+          await updatePublishingCatalogueRow(editingRowId, manualValues);
+        } else {
+          if (!String(manualValues.artist || '').trim() || !String(manualValues.track_title || '').trim()) throw new Error('Artist and Track Title are required.');
+          await updateLabelCatalogueRow(editingRowId, manualValues);
+        }
+        setMessage('Catalogue row updated.');
       } else {
-        if (!String(manualValues.artist || '').trim() || !String(manualValues.track_title || '').trim()) throw new Error('Artist and Track Title are required.');
-        await createLabelCatalogueRow(manualValues);
+        if (activeType === 'publishing') {
+          if (!String(manualValues.work_title || '').trim()) throw new Error('Work Title is required.');
+          await createPublishingCatalogueRow(manualValues);
+        } else {
+          if (!String(manualValues.artist || '').trim() || !String(manualValues.track_title || '').trim()) throw new Error('Artist and Track Title are required.');
+          await createLabelCatalogueRow(manualValues);
+        }
+        setMessage('Added new catalogue row.');
       }
       await loadActiveCatalogue(activeType);
       setShowAddForm(false);
       setManualValues({});
-      setMessage('Added new catalogue row.');
+      setEditingRowId('');
     } catch (err) {
-      setError(err.message || 'Failed to add catalogue row.');
+      setError(err.message || 'Failed to save catalogue row.');
     } finally {
       setSavingManual(false);
     }
+  }
+
+  function handleOpenAddForm() {
+    setError('');
+    setMessage('');
+    setPreview(null);
+    setShowAddForm(true);
+    setEditingRowId('');
+    setManualValues(activeType === 'publishing'
+      ? { work_title: '', writers: '', tempo_id: '', iswc: '' }
+      : { artist: '', track_title: '', version: '', release_title: '', isrc: '' });
+  }
+
+  function handleOpenEditForm(row) {
+    setError('');
+    setMessage('');
+    setPreview(null);
+    setShowAddForm(true);
+    setEditingRowId(String(row.id || ''));
+    setManualValues(activeType === 'publishing'
+      ? {
+          work_title: row.work_title || '',
+          writers: row.writers || '',
+          tempo_id: row.tempo_id || '',
+          iswc: row.iswc || ''
+        }
+      : {
+          artist: row.artist || '',
+          track_title: row.track_title || '',
+          version: row.version || '',
+          release_title: row.release_title || '',
+          isrc: row.isrc || ''
+        });
   }
 
   async function handleAddToPipeline(row) {
@@ -454,7 +512,7 @@ export default function CatalogueTables() {
       <ScreenHeader
         title="Catalogues"
         subtitle="Dedicated catalogue views for label and publishing records."
-        actions={<CatalogueActions importType={activeType} onTypeChange={setActiveType} onImport={() => inputRef.current?.click()} onAddNew={() => setShowAddForm(true)} disabled={fetching || importing || deleting || savingManual} />}
+        actions={<CatalogueActions importType={activeType} onTypeChange={setActiveType} onImport={() => inputRef.current?.click()} onAddNew={handleOpenAddForm} disabled={fetching || importing || deleting || savingManual} />}
       />
       <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleImport} hidden />
       {fetching ? <div className="module-card"><div className="loading-block">Loading…</div></div> : null}
@@ -466,8 +524,9 @@ export default function CatalogueTables() {
           values={manualValues}
           onChange={handleManualChange}
           onSave={handleSaveManual}
-          onCancel={() => { setShowAddForm(false); setManualValues({}); }}
+          onCancel={() => { setShowAddForm(false); setManualValues({}); setEditingRowId(''); }}
           saving={savingManual}
+          mode={editingRowId ? 'edit' : 'create'}
         />
       ) : null}
       {preview ? (
@@ -490,6 +549,7 @@ export default function CatalogueTables() {
         onToggleAll={handleToggleAll}
         onToggleRow={handleToggleRow}
         onAdd={handleAddToPipeline}
+        onEditRow={handleOpenEditForm}
         onDeleteRow={(id) => handleDelete([id])}
         onDeleteSelected={() => handleDelete(Array.from(selectedIds))}
         deleting={deleting}

@@ -249,6 +249,51 @@ export async function createPublishingCatalogueRow(values) {
   return normalized;
 }
 
+export async function updateLabelCatalogueRow(id, values) {
+  const rowId = normalizeText(id);
+  if (!rowId) throw new Error('Missing label catalogue row id.');
+  const db = getSupabaseClient();
+  console.log('[Catalogue Edit] Updating label row id:', rowId);
+  const payload = {
+    artist: normalizeText(values && values.artist),
+    track_title: normalizeText(values && values.track_title),
+    version: normalizeText(values && values.version) || null,
+    release_title: normalizeText(values && values.release_title) || null,
+    isrc: normalizeText(values && values.isrc) || null
+  };
+  const { data, error } = await db
+    .from('label_catalogue')
+    .update(payload)
+    .eq('id', rowId)
+    .select('id, artist, track_title, version, release_title, isrc');
+  if (error) throw error;
+  if (!Array.isArray(data) || !data.length) throw new Error('Label catalogue update failed.');
+  const freshRows = await fetchLabelCatalogue();
+  return freshRows.find((row) => row.id === rowId) || normalizeLabelRow(data[0]);
+}
+
+export async function updatePublishingCatalogueRow(id, values) {
+  const rowId = normalizeText(id);
+  if (!rowId) throw new Error('Missing publishing catalogue row id.');
+  const db = getSupabaseClient();
+  console.log('[Catalogue Edit] Updating publishing row id:', rowId);
+  const payload = {
+    work_title: normalizeText(values && values.work_title),
+    writers: normalizeText(values && values.writers) || null,
+    tempo_id: normalizeText(values && values.tempo_id) || null,
+    iswc: normalizeText(values && values.iswc) || null
+  };
+  const { data, error } = await db
+    .from('publishing_catalogue')
+    .update(payload)
+    .eq('id', rowId)
+    .select('id, work_title, writers, tempo_id, iswc');
+  if (error) throw error;
+  if (!Array.isArray(data) || !data.length) throw new Error('Publishing catalogue update failed.');
+  const freshRows = await fetchPublishingCatalogue();
+  return freshRows.find((row) => row.id === rowId) || normalizePublishingRow(data[0]);
+}
+
 export async function deleteLabelCatalogueRows(ids) {
   const rowIds = Array.from(ids || []).map((id) => normalizeText(id)).filter(Boolean);
   if (!rowIds.length) return 0;

@@ -3204,7 +3204,7 @@
           // Rebuild from the release data stored in currentReleasesData
           const relData = currentReleasesData.find(r => String(r.id) === String(rid));
           if (relData) {
-            const cachedAssets = allAssetsCache[String(rid)] || null;
+            const cachedAssets = getCachedAssetsForRelease(relData);
             compCell.innerHTML = roleCompletionCell(relData, cachedAssets);
           }
         }
@@ -3247,8 +3247,9 @@
       let items = [];
       let overallOk;
 
-      const assetsComp  = computeCompletion(assetsCache || []);
-      const assetsOk    = (assetsCache != null) ? assetsComp.overall : null;
+      const hasAssets   = Array.isArray(assetsCache) && assetsCache.length > 0;
+      const assetsComp  = hasAssets ? computeCompletion(assetsCache) : null;
+      const assetsOk    = hasAssets ? assetsComp.overall : null;
       const uploadsFromAssets = (assetsCache != null) ? uploadConfirmationReceived(assetsCache) : null;
       const uploadsOk   = uploadsFromAssets != null ? uploadsFromAssets : ((r.uploads_complete != null) ? r.uploads_complete : null);
       const contractFromContracts = signedContractExistsForRelease(r.id);

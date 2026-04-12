@@ -1,9 +1,9 @@
 {
   "pages": {
-    "/catalogues/page": [
+    "/contracts/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/catalogues/page.js"
+      "static/chunks/app/contracts/page.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
@@ -15,6 +15,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/releases/page.js"
+    ],
+    "/dashboard/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/dashboard/page.js"
     ]
   }
 }
