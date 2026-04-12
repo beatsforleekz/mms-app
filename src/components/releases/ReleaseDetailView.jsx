@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import ScreenHeader from '@/components/ScreenHeader';
-import { fetchActionsByRelease, fetchAssetsByRelease, fetchContractsByRelease, fetchReleaseById } from '@/lib/services/releases';
+import { fetchActionsByRelease, fetchAssetsByRelease, fetchContractsByRelease, fetchReleaseById, saveReleaseNote } from '@/lib/services/releases';
 import { filterStatementsByPayees } from '@/lib/services/statements';
 import { compareActions, formatDate, formatMoney } from '@/lib/utils/format';
 
@@ -45,8 +45,10 @@ function DetailList({ items, emptyText, renderItem }) {
   return <div className="detail-list">{items.map(renderItem)}</div>;
 }
 
-export default function ReleaseDetailView({ releaseId }) {
+export default function ReleaseDetailView({ releaseId, catalogueId, catalogueType }) {
   const [state, setState] = useState({ loading: true, error: '', release: null, assets: [], contracts: [], actions: [], statements: [] });
+  const [notesValue, setNotesValue] = useState('');
+  const [notesSaving, setNotesSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -54,10 +56,10 @@ export default function ReleaseDetailView({ releaseId }) {
       setState((prev) => ({ ...prev, loading: true, error: '' }));
       try {
         const [release, assets, contracts, actions] = await Promise.all([
-          fetchReleaseById(releaseId),
-          fetchAssetsByRelease(releaseId),
-          fetchContractsByRelease(releaseId),
-          fetchActionsByRelease(releaseId)
+          fetchReleaseById(releaseId, catalogueId, catalogueType),
+          fetchAssetsByRelease(releaseId, catalogueId, catalogueType),
+          fetchContractsByRelease(releaseId, catalogueId, catalogueType),
+          fetchActionsByRelease(releaseId, catalogueId, catalogueType)
         ]);
         if (!active) return;
         const statements = filterStatementsByPayees(collectPayeeNames(contracts));
@@ -70,14 +72,16 @@ export default function ReleaseDetailView({ releaseId }) {
           actions: actions.slice().sort(compareActions),
           statements
         });
+        setNotesValue(release && release.notes ? release.notes : '');
       } catch (err) {
         if (!active) return;
         setState({ loading: false, error: err.message || 'Failed to load release.', release: null, assets: [], contracts: [], actions: [], statements: [] });
+        setNotesValue('');
       }
     }
     if (releaseId) load();
     return () => { active = false; };
-  }, [releaseId]);
+  }, [releaseId, catalogueId, catalogueType]);
 
   if (state.loading) {
     return <section className="screen"><div className="module-card"><div className="loading-block">Loading release…</div></div></section>;
@@ -89,6 +93,20 @@ export default function ReleaseDetailView({ releaseId }) {
 
   const { release, assets, contracts, actions, statements } = state;
   const links = assets.filter((asset) => asset.dropbox_url);
+
+  async function handleSaveNotes() {
+    setNotesSaving(true);
+    try {
+      const nextNotes = saveReleaseNote(release.id, notesValue);
+      setState((prev) => ({
+        ...prev,
+        release: prev.release ? { ...prev.release, notes: nextNotes } : prev.release
+      }));
+      setNotesValue(nextNotes);
+    } finally {
+      setNotesSaving(false);
+    }
+  }
 
   return (
     <section className="screen">
@@ -125,7 +143,15 @@ export default function ReleaseDetailView({ releaseId }) {
               <div className="detail-item" key={asset.id}>
                 <div>
                   <strong>{asset.asset_title || '—'}</strong>
-                  <div className="detail-meta">{asset.area || '—'} · {asset.received ? 'Received' : 'Pending'} · {asset.required === false ? 'Optional' : 'Required'}</div>
+                  <div className="detail-meta">
+                    {asset.area || '—'} · {asset.received ? 'Received' : 'Pending'} · {asset.required === false ? 'Optional' : 'Required'}
+                    {asset.dropbox_url ? (
+                      <>
+                        {' · '}
+                        <a href={asset.dropbox_url} target="_blank" rel="noopener noreferrer">Open link</a>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             )}
@@ -148,7 +174,20 @@ export default function ReleaseDetailView({ releaseId }) {
         </DetailCard>
 
         <DetailCard title="Notes">
-          <div className="detail-notes">{release.notes || 'No notes recorded for this release.'}</div>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <textarea
+              className="detail-notes"
+              value={notesValue}
+              onChange={(event) => setNotesValue(event.target.value)}
+              placeholder="Add release notes…"
+              style={{ minHeight: 140, resize: 'vertical' }}
+            />
+            <div>
+              <button type="button" className="shell-btn shell-btn-primary" onClick={handleSaveNotes} disabled={notesSaving}>
+                {notesSaving ? 'Saving…' : 'Save Notes'}
+              </button>
+            </div>
+          </div>
         </DetailCard>
 
         <DetailCard title="Contracts" count={contracts.length}>

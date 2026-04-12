@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NAV_ITEMS, ROUTE_META } from '@/lib/config';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 function routeMetaForPath(pathname) {
   if (pathname.startsWith('/releases/')) {
@@ -16,17 +17,58 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const meta = useMemo(() => routeMetaForPath(pathname || '/dashboard'), [pathname]);
+  const [authReady, setAuthReady] = useState(false);
+  const [session, setSession] = useState(null);
+  const isLoginRoute = pathname === '/login';
 
   useEffect(() => {
     function handleMessage(event) {
       if (!event.data || typeof event.data !== 'object') return;
-      if (event.data.type === 'open-release-detail' && event.data.releaseId) {
-        router.push(`/releases/${event.data.releaseId}`);
+      if (event.data.type === 'open-release-detail' && event.data.releaseId && event.data.catalogueId && event.data.catalogueType) {
+        const params = new URLSearchParams({
+          catalogue_id: String(event.data.catalogueId),
+          catalogue_type: String(event.data.catalogueType)
+        });
+        router.push(`/releases/${event.data.releaseId}?${params.toString()}`);
       }
     }
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [router]);
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSession(data.session || null);
+      setAuthReady(true);
+      if (!data.session && !isLoginRoute) router.replace('/login');
+      if (data.session && isLoginRoute) router.replace('/dashboard');
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession || null);
+      setAuthReady(true);
+      if (!nextSession && !isLoginRoute) router.replace('/login');
+      if (nextSession && isLoginRoute) router.replace('/dashboard');
+    });
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, [isLoginRoute, router]);
+
+  if (!authReady) {
+    return <div className="auth-shell"><div className="auth-card"><div className="loading-block">Loading…</div></div></div>;
+  }
+
+  if (isLoginRoute) {
+    return <>{children}</>;
+  }
+
+  if (!session) {
+    return <div className="auth-shell"><div className="auth-card"><div className="loading-block">Redirecting…</div></div></div>;
+  }
 
   return (
     <div className="app-shell">

@@ -3412,6 +3412,20 @@
               if (typeof populateActionReleaseDropdown === 'function') populateActionReleaseDropdown(currentReleasesData);
             } catch(err) { alert('Delete failed: ' + err.message); }
           });
+          tr.style.cursor = 'pointer';
+          tr.title = 'Open release view';
+          tr.addEventListener('click', function() {
+            try {
+              window.parent && window.parent.postMessage({
+                type: 'open-release-detail',
+                releaseId: r.id,
+                catalogueId: r.catalogue_id || '',
+                catalogueType: r.catalogue_type || ''
+              }, '*');
+            } catch (err) {
+              console.warn('[Release Pipeline] Failed to open release detail.', err);
+            }
+          });
           elRelTbody.appendChild(tr);
         });
 

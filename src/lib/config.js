@@ -13,7 +13,8 @@ export const ROUTE_META = {
   '/actions': { title: 'Actions', subtitle: 'Operational task tracking ordered for day-to-day use.' },
   '/qa': { title: 'Quality Assurance', subtitle: 'QA checklists and sign-off workflows.' },
   '/statements': { title: 'Statements', subtitle: 'Statement tracking, imports, and local storage workflows.' },
-  '/contract-generator': { title: 'Contract Generator', subtitle: 'Plain-text contract generation with reusable templates.' }
+  '/contract-generator': { title: 'Contract Generator', subtitle: 'Plain-text contract generation with reusable templates.' },
+  '/settings': { title: 'Settings', subtitle: 'Account access and basic security controls.' }
 };
 
 export const NAV_ITEMS = [
@@ -26,5 +27,6 @@ export const NAV_ITEMS = [
   { href: '/actions', label: 'Actions' },
   { href: '/qa', label: 'Quality Assurance' },
   { href: '/statements', label: 'Statements' },
-  { href: '/contract-generator', label: 'Contract Generator' }
+  { href: '/contract-generator', label: 'Contract Generator' },
+  { href: '/settings', label: 'Settings' }
 ];
