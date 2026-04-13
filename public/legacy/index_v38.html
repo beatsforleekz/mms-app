@@ -3320,7 +3320,7 @@
       const assetsOk = hasAssets ? assetsComp.overall : null;
       const uploadsFromAssets = hasAssets ? uploadConfirmationReceived(assetsCache) : null;
       const uploadsOk = uploadsFromAssets != null ? uploadsFromAssets : ((r && r.uploads_complete != null) ? r.uploads_complete : null);
-      const contractOk = signedContractExistsForRelease(r && r.id) ? true : ((r && r.contract_received != null) ? r.contract_received : null);
+      const contractOk = signedContractExistsForRelease(r) ? true : ((r && r.contract_received != null) ? r.contract_received : null);
       const pubCatOk = (r && r.added_to_pub_cat != null) ? r.added_to_pub_cat : null;
       const sonyOk = (r && r.registered_with_sony != null) ? r.registered_with_sony : null;
       function part(label, val) {
@@ -3355,9 +3355,25 @@
       return String(roleValue || '').toLowerCase().includes(String(token || '').toLowerCase());
     }
 
-    function signedContractExistsForRelease(releaseId) {
+    function signedContractExistsForRelease(releaseLike) {
+      const releaseId = typeof releaseLike === 'object' && releaseLike
+        ? String(releaseLike.id || '')
+        : String(releaseLike || '');
+      const catalogueId = typeof releaseLike === 'object' && releaseLike
+        ? String(releaseLike.catalogue_id || '')
+        : '';
+      const catalogueType = typeof releaseLike === 'object' && releaseLike
+        ? (String(releaseLike.catalogue_type || '').toLowerCase() === 'publishing' ? 'publishing' : 'label')
+        : '';
+
       return (allContracts || []).some(function(c) {
-        return String(c.release_id || '') === String(releaseId || '') && String(c.status || '').toLowerCase() === 'signed';
+        if (String(c.status || '').toLowerCase() !== 'signed') return false;
+        if (releaseId && String(c.release_id || '') === releaseId) return true;
+        if (catalogueId && String(c.catalogue_id || '') === catalogueId && (String(c.catalogue_type || '').toLowerCase() === catalogueType)) return true;
+        return contractLinkedReleaseItems(c).some(function(item) {
+          return String(item && item.catalogue_id || '') === catalogueId
+            && (String(item && item.catalogue_type || '').toLowerCase() === catalogueType);
+        });
       });
     }
 
@@ -3392,7 +3408,7 @@
       const assetsOk    = hasAssets ? assetsComp.overall : null;
       const uploadsFromAssets = (assetsCache != null) ? uploadConfirmationReceived(assetsCache) : null;
       const uploadsOk   = uploadsFromAssets != null ? uploadsFromAssets : ((r.uploads_complete != null) ? r.uploads_complete : null);
-      const contractFromContracts = signedContractExistsForRelease(r.id);
+      const contractFromContracts = signedContractExistsForRelease(r);
       const contractOk = contractFromContracts ? true : ((r.contract_received != null) ? r.contract_received : null);
       const pubCatOk   = (r.added_to_pub_cat != null) ? r.added_to_pub_cat : null;
       const sonyOk     = (r.registered_with_sony != null) ? r.registered_with_sony : null;
