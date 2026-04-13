@@ -11,9 +11,8 @@ export const ROUTE_META = {
   '/contracts': { title: 'Contracts', subtitle: 'Contract records, payees, royalty participation, and file links.' },
   '/payees': { title: 'Payees', subtitle: 'Reusable payee records shared across contracts and statements.' },
   '/actions': { title: 'Actions', subtitle: 'Operational task tracking ordered for day-to-day use.' },
-  '/qa': { title: 'Quality Assurance', subtitle: 'QA checklists and sign-off workflows.' },
   '/statements': { title: 'Statements', subtitle: 'Statement tracking, imports, and local storage workflows.' },
-  '/contract-generator': { title: 'Contract Generator', subtitle: 'Plain-text contract generation with reusable templates.' },
+  '/contract-generator': { title: 'Doc Generator', subtitle: 'Plain-text document generation with reusable templates.' },
   '/settings': { title: 'Settings', subtitle: 'Account access and basic security controls.' }
 };
 
@@ -25,8 +24,7 @@ export const NAV_ITEMS = [
   { href: '/contracts', label: 'Contracts' },
   { href: '/payees', label: 'Payees' },
   { href: '/actions', label: 'Actions' },
-  { href: '/qa', label: 'Quality Assurance' },
   { href: '/statements', label: 'Statements' },
-  { href: '/contract-generator', label: 'Contract Generator' },
+  { href: '/contract-generator', label: 'Doc Generator' },
   { href: '/settings', label: 'Settings' }
 ];

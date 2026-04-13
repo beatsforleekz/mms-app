@@ -1435,9 +1435,8 @@
       <button class="nav-btn" data-section="contracts"><span class="icon">◻</span> Contracts</button>
       <button class="nav-btn" data-section="payees"><span class="icon">👤</span> Payees</button>
       <button class="nav-btn" data-section="actions"><span class="icon">✓</span> Actions</button>
-      <button class="nav-btn" data-section="qa"><span class="icon">⊛</span> Quality Assurance</button>
       <button class="nav-btn" data-section="statements"><span class="icon">$</span> Statements</button>
-      <button class="nav-btn" data-section="contract-generator"><span class="icon">✍</span> Contract Generator</button>
+      <button class="nav-btn" data-section="contract-generator"><span class="icon">✍</span> Doc Generator</button>
     </nav>
     <div class="sidebar-footer">Operations · Internal tool</div>
   </aside>
@@ -1781,7 +1780,7 @@
           <input type="hidden" id="contract-editing-id" value="" />
 
           <!-- ── v36e Debug Panel (Contracts only) ── -->
-          <div id="contract-debug-panel" style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;">
+          <div id="contract-debug-panel" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;">
             <div style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e;margin-bottom:6px;font-size:11px;">🔍 Debug — Contract / Payees</div>
             <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;">
               <span style="color:#78350f;font-weight:600;">Eddy visible:</span><span id="dbg-eddy-visible" style="font-family:monospace;">—</span>
@@ -2464,7 +2463,7 @@
         <div class="section-header">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;">
             <div>
-              <h2>Contract Generator</h2>
+              <h2>Doc Generator</h2>
               <p>Select a contract type and template, fill in the variable fields, then copy the generated text.</p>
             </div>
             <button class="btn btn-ghost" id="cgen-show-add-tpl-btn">+ Add Template</button>
@@ -2615,7 +2614,7 @@
     const APP_PARAMS = new URLSearchParams(window.location.search);
     const EMBED_MODE = APP_PARAMS.get('embed') === '1';
     const INITIAL_SECTION = APP_PARAMS.get('section') || 'dashboard';
-    const TITLES = { 'dashboard':'Dashboard','releases':'Release Pipeline','assets':'Assets Checklist','contracts':'Contracts','payees':'Payees','actions':'Actions','qa':'Quality Assurance','statements':'Statements','contract-generator':'Contract Generator' };
+    const TITLES = { 'dashboard':'Dashboard','releases':'Release Pipeline','assets':'Assets Checklist','contracts':'Contracts','payees':'Payees','actions':'Actions','statements':'Statements','contract-generator':'Doc Generator' };
     const navButtons  = document.querySelectorAll('.nav-btn');
     const sections    = document.querySelectorAll('.section');
     const topbarTitle = document.getElementById('topbar-title');
