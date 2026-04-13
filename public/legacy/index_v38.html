@@ -1804,13 +1804,6 @@
               <div class="combo-entry" id="cf-type-combo">
                 <select class="combo-select" id="cf-type-select">
                   <option value="">— select type —</option>
-                  <option value="Master">Master</option>
-                  <option value="Publishing">Publishing</option>
-                  <option value="Remix">Remix</option>
-                  <option value="Producer">Producer</option>
-                  <option value="Add-Producer">Add-Producer</option>
-                  <option value="Co-Producer">Co-Producer</option>
-                  <option value="Single Song Assignment">Single Song Assignment</option>
                   <option value="__custom__">Custom…</option>
                 </select>
                 <input class="combo-input" id="cf-type-custom" type="text" placeholder="or type a custom type" />
@@ -2474,9 +2467,10 @@
         <!-- Add Template Form -->
         <div class="cgen-add-tpl-panel hidden" id="cgen-add-tpl-panel">
           <div class="cgen-add-tpl-title">
-            <span>Add Custom Template</span>
+            <span id="cgen-add-tpl-title-text">Add Custom Template</span>
             <button class="btn btn-ghost" id="cgen-add-tpl-close" style="padding:3px 10px;font-size:12px;">✕ Close</button>
           </div>
+          <input type="hidden" id="cgen-editing-tpl-id" value="" />
             <div class="cgen-add-tpl-grid">
             <div class="cgen-add-tpl-field">
               <label class="cgen-label" for="cgen-tpl-name">Template Name *</label>
@@ -2484,13 +2478,13 @@
             </div>
             <div class="cgen-add-tpl-field">
               <label class="cgen-label" for="cgen-tpl-type">Contract Type *</label>
-              <select class="cgen-select" id="cgen-tpl-type">
-                <option value="master">Master Agreement</option>
-                <option value="add-producer">Additional Production Agreement</option>
-                <option value="publishing">Exclusive Publishing Agreement</option>
-                <option value="single-song">Single Song Assignment</option>
-                <option value="remix">Remix Agreement</option>
-              </select>
+              <div class="combo-entry">
+                <select class="combo-select" id="cgen-tpl-type-select">
+                  <option value="">— select type —</option>
+                  <option value="__custom__">Custom…</option>
+                </select>
+                <input class="combo-input" id="cgen-tpl-type-custom" type="text" placeholder="or type a new contract type" />
+              </div>
             </div>
             <div class="cgen-add-tpl-field full">
               <label class="cgen-label" for="cgen-tpl-body">Template Body *</label>
@@ -2529,11 +2523,7 @@
             <div class="cgen-field">
               <label class="cgen-label" for="cgen-type-select">Contract Type</label>
               <select class="cgen-select" id="cgen-type-select">
-                <option value="master">Master Agreement</option>
-                <option value="add-producer">Additional Production Agreement</option>
-                <option value="publishing">Exclusive Publishing Agreement</option>
-                <option value="single-song">Single Song Assignment</option>
-                <option value="remix">Remix Agreement</option>
+                <option value="">— select type —</option>
               </select>
             </div>
 
@@ -2544,46 +2534,7 @@
               </select>
             </div>
 
-            <!-- Common fields -->
-            <div class="cgen-section-label">Common Fields</div>
-
-            <div class="cgen-field">
-              <label class="cgen-label" for="cgen-f-title">Contract Title</label>
-              <input class="cgen-input" id="cgen-f-title" type="text" placeholder="e.g. Master Recording Agreement" />
-            </div>
-            <div class="cgen-field">
-              <label class="cgen-label" for="cgen-f-date">Date</label>
-              <input class="cgen-input" id="cgen-f-date" type="date" />
-            </div>
-            <div class="cgen-field">
-              <label class="cgen-label" for="cgen-f-company">Company Name</label>
-              <input class="cgen-input" id="cgen-f-company" type="text" placeholder="Leah Records Ltd." />
-            </div>
-            <div class="cgen-field">
-              <label class="cgen-label" for="cgen-f-company-addr">Company Address</label>
-              <textarea class="cgen-textarea" id="cgen-f-company-addr" rows="2" placeholder="123 Music Lane, London…"></textarea>
-            </div>
-            <div class="cgen-field">
-              <label class="cgen-label" for="cgen-f-counterparty">Counterparty Name</label>
-              <input class="cgen-input" id="cgen-f-counterparty" type="text" placeholder="Artist / Company Name" />
-            </div>
-            <div class="cgen-field">
-              <label class="cgen-label" for="cgen-f-counterparty-addr">Counterparty Address</label>
-              <textarea class="cgen-textarea" id="cgen-f-counterparty-addr" rows="2" placeholder="Address…"></textarea>
-            </div>
-            <div class="cgen-field">
-              <label class="cgen-label" for="cgen-f-territory">Territory</label>
-              <input class="cgen-input" id="cgen-f-territory" type="text" placeholder="e.g. Worldwide" />
-            </div>
-            <div class="cgen-field">
-              <label class="cgen-label" for="cgen-f-notes">Notes / Additional Terms</label>
-              <textarea class="cgen-textarea" id="cgen-f-notes" rows="2" placeholder="Any additional notes…"></textarea>
-            </div>
-
-            <!-- Type-specific fields — rendered by JS -->
-            <div id="cgen-type-fields"></div>
-
-            <!-- Custom template variable fields — rendered by JS -->
+            <!-- Template fields — rendered by JS -->
             <div id="cgen-custom-var-fields"></div>
 
             <button class="btn btn-primary" id="cgen-generate-btn" style="width:100%;margin-top:8px;justify-content:center;">⟳ Generate Contract</button>
@@ -7710,169 +7661,76 @@ Best regards`;
     // ══════════════════════════════════════════════════════════════════════════
     //  CONTRACT GENERATOR (v38)
     // ══════════════════════════════════════════════════════════════════════════
+    const CGEN_STORAGE_KEY = 'leah_cgen_templates_v1';
+
+    function loadCustomDocTemplates() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(CGEN_STORAGE_KEY) || '[]');
+        return Array.isArray(raw) ? raw : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function getCustomDocTemplateTypes() {
+      return Array.from(new Set(loadCustomDocTemplates().map(function(t) {
+        return String(t && t.type || '').trim();
+      }).filter(Boolean))).sort(function(a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
+    }
+
+    function refreshContractTypeOptions() {
+      if (!cfTypeSelect) return;
+      const types = getCustomDocTemplateTypes();
+      const currentValue = typeCombo.getValue();
+      cfTypeSelect.innerHTML = '<option value="">— select type —</option>';
+      types.forEach(function(type) {
+        const option = document.createElement('option');
+        option.value = type;
+        option.textContent = type;
+        cfTypeSelect.appendChild(option);
+      });
+      const customOption = document.createElement('option');
+      customOption.value = '__custom__';
+      customOption.textContent = 'Custom…';
+      cfTypeSelect.appendChild(customOption);
+      typeCombo.setValue(currentValue);
+    }
+
     (function() {
 
-      // ── Built-in templates ────────────────────────────────────────────────
-      const BUILTIN_TEMPLATES = {
-        master: [],
-        'add-producer': [],
-        publishing: [],
-        'single-song': [],
-        remix: []
-      };
-
-      // ── Type-specific fields config ───────────────────────────────────────
-      const TYPE_FIELDS = {
-        master: [
-          { key: 'ARTIST_LEGAL_NAMES', label: 'Artist Legal Name(s)', type: 'text', placeholder: 'Full legal name(s)' },
-          { key: 'ARTIST_PKA',         label: 'Artist PKA(s)',         type: 'text', placeholder: 'Stage name / p/k/a' },
-          { key: 'PRODUCT_COMMITMENT', label: 'Product Commitment',    type: 'text', placeholder: 'e.g. 1 album of 10 tracks' },
-          { key: 'OPTIONS',            label: 'Options',               type: 'text', placeholder: 'e.g. 2 option periods' },
-          { key: 'ADVANCE',            label: 'Advance',               type: 'text', placeholder: 'e.g. £5,000' },
-          { key: 'ROYALTY_PERCENT',    label: 'Royalty %',             type: 'text', placeholder: 'e.g. 20' },
-          { key: 'RELEASE_COMMITMENT', label: 'Release Commitment',    type: 'text', placeholder: 'e.g. 12 months of delivery' },
-          { key: 'TERM',               label: 'Term',                  type: 'text', placeholder: 'e.g. 12 months' },
-        ],
-        'add-producer': [
-          { key: 'PROJECT_TITLE', label: 'Project / Recording', type: 'text', placeholder: 'Track or project title' },
-          { key: 'SERVICES',      label: 'Services',            type: 'textarea', placeholder: 'Additional production, edits, revisions…' },
-          { key: 'FEE',           label: 'Fixed Fee',           type: 'text', placeholder: 'e.g. €350' },
-          { key: 'BONUS_CLAUSE',  label: 'Bonus Clause',        type: 'textarea', placeholder: 'e.g. €500 upon 5M streams' },
-        ],
-        publishing: [
-          { key: 'WRITER_LEGAL_NAME', label: 'Writer Legal Name',    type: 'text',     placeholder: 'Full legal name' },
-          { key: 'WRITER_ADDRESS',    label: 'Writer Address',        type: 'textarea', placeholder: 'Writer address' },
-          { key: 'WRITER_CAE',        label: 'Writer IPI / CAE',      type: 'text',     placeholder: 'IPI/CAE number' },
-          { key: 'ADVANCE',           label: 'Advance',               type: 'text',     placeholder: 'e.g. £2,000' },
-          { key: 'TERM',              label: 'Term',                  type: 'text',     placeholder: 'e.g. 2 years' },
-          { key: 'SCHEDULE_WORKS',    label: 'Schedule / Works List', type: 'textarea', placeholder: 'List compositions…' },
-        ],
-        'single-song': [
-          { key: 'WRITER_NAMES',    label: 'Writer Name(s)',     type: 'text',     placeholder: 'All co-writers' },
-          { key: 'WORK_TITLE',      label: 'Work Title',         type: 'text',     placeholder: 'Song title' },
-          { key: 'OWNERSHIP_SPLITS',label: 'Ownership Split(s)', type: 'textarea', placeholder: 'e.g. Writer A: 50%, Writer B: 50%' },
-        ],
-        remix: [
-          { key: 'REMIXER_NAME',    label: 'Remixer Name',     type: 'text',     placeholder: 'Remixer / producer name' },
-          { key: 'ORIGINAL_TITLE',  label: 'Original Title',   type: 'text',     placeholder: 'Title of original track' },
-          { key: 'ARTIST_NAMES',    label: 'Artist Name(s)',   type: 'text',     placeholder: 'Original artist(s)' },
-          { key: 'ADVANCE',         label: 'Advance / Fee',    type: 'text',     placeholder: 'e.g. £500 flat fee' },
-          { key: 'BONUS_TERMS',     label: 'Bonus Terms',      type: 'textarea', placeholder: 'e.g. £500 if streams exceed 1M' },
-          { key: 'CREDIT_WORDING',  label: 'Credit Wording',   type: 'textarea', placeholder: 'e.g. "Remixed by DJ X"' },
-        ]
-      };
-
-      // ── Local storage for saved custom templates ───────────────────────────
-      const CGEN_STORAGE_KEY = 'leah_cgen_templates_v1';
-      function cgenLoadSaved() {
-        try { return JSON.parse(localStorage.getItem(CGEN_STORAGE_KEY) || '[]'); }
-        catch(e) { return []; }
-      }
-      function cgenSaveSaved(arr) {
-        try { localStorage.setItem(CGEN_STORAGE_KEY, JSON.stringify(arr)); } catch(e) {}
-      }
-
-      // ── State ─────────────────────────────────────────────────────────────
-      let customTemplates = cgenLoadSaved();
+      let customTemplates = loadCustomDocTemplates();
       let tplCustomFieldRows = [];
 
-      // ── Helpers ───────────────────────────────────────────────────────────
       function get(id) { return document.getElementById(id); }
 
-      function formatDate(dateStr) {
-        const d = parseDateValue(dateStr);
-        if (!d) return '';
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      function cgenSaveSaved(arr) {
+        customTemplates = Array.isArray(arr) ? arr : [];
+        try { localStorage.setItem(CGEN_STORAGE_KEY, JSON.stringify(customTemplates)); } catch(e) {}
       }
 
-      function cgenGetTemplateMeta() {
-        const tplVal = get('cgen-template-select').value;
-        if (tplVal.startsWith('builtin:')) {
-          const tplId = tplVal.replace('builtin:', '');
-          const type = get('cgen-type-select').value;
-          return (BUILTIN_TEMPLATES[type] || []).find(function(t) { return t.id === tplId; }) || null;
-        }
-        if (tplVal.startsWith('custom:')) {
-          const tplId = tplVal.replace('custom:', '');
-          return customTemplates.find(function(t) { return t.id === tplId; }) || null;
-        }
-        return null;
-      }
-
-      // ── Populate template select ──────────────────────────────────────────
-      function cgenPopulateTemplateSelect() {
-        const type = get('cgen-type-select').value;
-        const sel = get('cgen-template-select');
-        sel.innerHTML = '';
-        // Built-ins
-        (BUILTIN_TEMPLATES[type] || []).forEach(function(t) {
-          const o = document.createElement('option');
-          o.value = 'builtin:' + t.id;
-          o.textContent = t.name;
-          sel.appendChild(o);
-        });
-        // Custom saved templates of this type
-        customTemplates.filter(t => t.type === type).forEach(function(t) {
-          const o = document.createElement('option');
-          o.value = 'custom:' + t.id;
-          o.textContent = t.name + ' (custom)';
-          sel.appendChild(o);
+      function cgenGetTemplateTypes() {
+        return Array.from(new Set(customTemplates.map(function(t) {
+          return String(t && t.type || '').trim();
+        }).filter(Boolean))).sort(function(a, b) {
+          return a.localeCompare(b, undefined, { sensitivity: 'base' });
         });
       }
 
-      // ── Render type-specific fields ───────────────────────────────────────
-      function cgenRenderTypeFields() {
-        const type = get('cgen-type-select').value;
-        const wrap = get('cgen-type-fields');
-        wrap.innerHTML = '';
-        const fields = TYPE_FIELDS[type] || [];
-        if (fields.length) {
-          const lbl = document.createElement('div');
-          lbl.className = 'cgen-section-label';
-          lbl.textContent = get('cgen-type-select').options[get('cgen-type-select').selectedIndex].text + ' Fields';
-          wrap.appendChild(lbl);
-        }
-        fields.forEach(function(f) {
-          const div = document.createElement('div');
-          div.className = 'cgen-field';
-          div.innerHTML =
-            '<label class="cgen-label">' + f.label + '</label>' +
-            (f.type === 'textarea'
-              ? '<textarea class="cgen-textarea" id="cgen-tf-' + f.key + '" rows="2" placeholder="' + (f.placeholder||'') + '"></textarea>'
-              : '<input class="cgen-input" id="cgen-tf-' + f.key + '" type="' + (f.type||'text') + '" placeholder="' + (f.placeholder||'') + '" />');
-          wrap.appendChild(div);
-        });
-      }
+      const tplTypeCombo = comboEntry(get('cgen-tpl-type-select'), get('cgen-tpl-type-custom'), '__custom__');
 
-      // ── Render custom variable fields for selected custom template ─────────
-      function cgenRenderCustomVarFields() {
-        const tplVal = get('cgen-template-select').value;
-        const wrap = get('cgen-custom-var-fields');
-        wrap.innerHTML = '';
-        if (!tplVal.startsWith('custom:')) return;
-        const tplId = tplVal.replace('custom:', '');
-        const tpl = customTemplates.find(t => t.id === tplId);
-        if (!tpl || !tpl.customFields || !tpl.customFields.length) return;
-        const lbl = document.createElement('div');
-        lbl.className = 'cgen-section-label';
-        lbl.textContent = 'Custom Template Fields';
-        wrap.appendChild(lbl);
-        tpl.customFields.forEach(function(f) {
-          const div = document.createElement('div');
-          div.className = 'cgen-field';
-          div.innerHTML =
-            '<label class="cgen-label">' + f.label + '</label>' +
-            (f.inputType === 'textarea'
-              ? '<textarea class="cgen-textarea" id="cgen-cv-' + f.key + '" rows="2"></textarea>'
-              : '<input class="cgen-input" id="cgen-cv-' + f.key + '" type="' + (f.inputType === 'number' ? 'number' : f.inputType === 'date' ? 'date' : 'text') + '" />');
-          wrap.appendChild(div);
-        });
-      }
-
-      // ── Get template body ─────────────────────────────────────────────────
-      function cgenGetTemplateBody() {
-        const tpl = cgenGetTemplateMeta();
-        return tpl ? tpl.body : '';
+      function cgenResetTemplateForm() {
+        get('cgen-editing-tpl-id').value = '';
+        get('cgen-add-tpl-title-text').textContent = 'Add Custom Template';
+        get('cgen-tpl-name').value = '';
+        tplTypeCombo.reset();
+        get('cgen-tpl-body').value = '';
+        tplCustomFieldRows = [];
+        cgenRenderTplCustomFieldRows();
+        const fb = get('cgen-tpl-feedback');
+        fb.textContent = '';
+        fb.className = 'cgen-feedback';
       }
 
       function cgenFormatPlainText(body) {
@@ -7890,56 +7748,163 @@ Best regards`;
         return text.trim();
       }
 
-      // ── Generate ──────────────────────────────────────────────────────────
+      function cgenPopulateTypeSelect() {
+        const sel = get('cgen-type-select');
+        const current = sel.value;
+        sel.innerHTML = '<option value="">— select type —</option>';
+        cgenGetTemplateTypes().forEach(function(type) {
+          const o = document.createElement('option');
+          o.value = type;
+          o.textContent = type;
+          sel.appendChild(o);
+        });
+        if (current && Array.from(sel.options).some(function(o) { return o.value === current; })) sel.value = current;
+        else if (!sel.value && sel.options.length > 1) sel.selectedIndex = 1;
+        else sel.value = '';
+      }
+
+      function cgenPopulateTplTypeSelect() {
+        const sel = get('cgen-tpl-type-select');
+        const current = tplTypeCombo.getValue();
+        sel.innerHTML = '<option value="">— select type —</option>';
+        cgenGetTemplateTypes().forEach(function(type) {
+          const o = document.createElement('option');
+          o.value = type;
+          o.textContent = type;
+          sel.appendChild(o);
+        });
+        const customOption = document.createElement('option');
+        customOption.value = '__custom__';
+        customOption.textContent = 'Custom…';
+        sel.appendChild(customOption);
+        tplTypeCombo.setValue(current);
+      }
+
+      function cgenGetSelectedTemplate() {
+        const tplVal = get('cgen-template-select').value;
+        if (!tplVal || !tplVal.startsWith('custom:')) return null;
+        const tplId = tplVal.replace('custom:', '');
+        return customTemplates.find(function(t) { return t.id === tplId; }) || null;
+      }
+
+      function cgenExtractTemplatePlaceholders(body) {
+        const seen = new Set();
+        const keys = [];
+        const regex = /\{\{\s*([^}]+?)\s*\}\}/g;
+        let match;
+        while ((match = regex.exec(String(body || '')))) {
+          const key = String(match[1] || '').trim();
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          keys.push(key);
+        }
+        return keys;
+      }
+
+      function cgenEscapeRegex(value) {
+        return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      function cgenGetTemplateFieldDefs(tpl) {
+        if (!tpl) return [];
+        const metadata = new Map();
+        (tpl.customFields || []).forEach(function(field, index) {
+          const label = String(field && field.label || field && field.key || '').trim() || ('Field ' + (index + 1));
+          const key = String(field && field.key || '').trim();
+          const meta = {
+            key: key || label,
+            label: label,
+            inputType: String(field && field.inputType || 'text').trim() || 'text'
+          };
+          metadata.set(label, meta);
+          if (key) metadata.set(key, meta);
+        });
+        return cgenExtractTemplatePlaceholders(tpl.body).map(function(placeholder, index) {
+          const meta = metadata.get(placeholder) || {
+            key: placeholder,
+            label: placeholder,
+            inputType: 'text'
+          };
+          return {
+            key: meta.key,
+            label: meta.label,
+            inputType: meta.inputType,
+            placeholder: placeholder,
+            inputId: 'cgen-cv-' + index
+          };
+        });
+      }
+
+      function cgenPopulateTemplateSelect() {
+        const type = get('cgen-type-select').value;
+        const sel = get('cgen-template-select');
+        const current = sel.value;
+        sel.innerHTML = '';
+        customTemplates.filter(function(t) { return t.type === type; }).forEach(function(t) {
+          const o = document.createElement('option');
+          o.value = 'custom:' + t.id;
+          o.textContent = t.name;
+          sel.appendChild(o);
+        });
+        if (current && Array.from(sel.options).some(function(o) { return o.value === current; })) sel.value = current;
+      }
+
+      function cgenRenderCustomVarFields() {
+        const wrap = get('cgen-custom-var-fields');
+        wrap.innerHTML = '';
+        const tpl = cgenGetSelectedTemplate();
+        if (!tpl) {
+          const msg = document.createElement('div');
+          msg.className = 'cgen-field';
+          msg.innerHTML = '<div style="font-size:12px;color:var(--muted);">Select a template to show its fields.</div>';
+          wrap.appendChild(msg);
+          return;
+        }
+        const fields = cgenGetTemplateFieldDefs(tpl);
+        if (!fields.length) {
+          const msg = document.createElement('div');
+          msg.className = 'cgen-field';
+          msg.innerHTML = '<div style="font-size:12px;color:var(--muted);">This template has no fields.</div>';
+          wrap.appendChild(msg);
+          return;
+        }
+        const lbl = document.createElement('div');
+        lbl.className = 'cgen-section-label';
+        lbl.textContent = tpl.name + ' Fields';
+        wrap.appendChild(lbl);
+        fields.forEach(function(f) {
+          const div = document.createElement('div');
+          div.className = 'cgen-field';
+          div.innerHTML =
+            '<label class="cgen-label">' + escapeHtml(f.label || f.placeholder || 'Field') + '</label>' +
+            (f.inputType === 'textarea'
+              ? '<textarea class="cgen-textarea" id="' + f.inputId + '" rows="2"></textarea>'
+              : '<input class="cgen-input" id="' + f.inputId + '" type="' + (f.inputType === 'number' ? 'number' : f.inputType === 'date' ? 'date' : 'text') + '" />');
+          wrap.appendChild(div);
+        });
+      }
+
+      function cgenGetTemplateBody() {
+        const tpl = cgenGetSelectedTemplate();
+        return tpl ? tpl.body : '';
+      }
+
       function cgenGenerate() {
         let body = cgenGetTemplateBody();
         if (!body) { get('cgen-output').value = 'No template selected.'; return; }
-
-        // Common field values
-        const common = {
-          CONTRACT_TITLE:       (get('cgen-f-title').value || '').trim(),
-          DATE:                 formatDate(get('cgen-f-date').value) || get('cgen-f-date').value || '',
-          COMPANY_NAME:         (get('cgen-f-company').value || '').trim(),
-          COMPANY_ADDRESS:      (get('cgen-f-company-addr').value || '').trim(),
-          COUNTERPARTY_NAME:    (get('cgen-f-counterparty').value || '').trim(),
-          COUNTERPARTY_ADDRESS: (get('cgen-f-counterparty-addr').value || '').trim(),
-          TERRITORY:            (get('cgen-f-territory').value || '').trim(),
-          NOTES:                (get('cgen-f-notes').value || '').trim(),
-        };
-
-        // Type-specific fields
-        const type = get('cgen-type-select').value;
-        const typeSpecific = {};
-        (TYPE_FIELDS[type] || []).forEach(function(f) {
-          const el = get('cgen-tf-' + f.key);
-          typeSpecific[f.key] = el ? (el.value || '').trim() : '';
+        const tpl = cgenGetSelectedTemplate();
+        const vars = {};
+        cgenGetTemplateFieldDefs(tpl).forEach(function(f) {
+          const el = get(f.inputId);
+          vars[f.placeholder] = el ? (el.value || '').trim() : '';
         });
-
-        // Custom variable fields
-        const customVars = {};
-        const tplVal = get('cgen-template-select').value;
-        if (tplVal.startsWith('custom:')) {
-          const tplId = tplVal.replace('custom:', '');
-          const tpl = customTemplates.find(t => t.id === tplId);
-          if (tpl && tpl.customFields) {
-            tpl.customFields.forEach(function(f) {
-              const el = get('cgen-cv-' + f.key);
-              customVars[f.key] = el ? (el.value || '').trim() : '';
-            });
-          }
-        }
-
-        // Replace all placeholders
-        const allVars = Object.assign({}, common, typeSpecific, customVars);
-        Object.keys(allVars).forEach(function(k) {
-          const re = new RegExp('\\{\\{' + k + '\\}\\}', 'g');
-          body = body.replace(re, allVars[k] || '[' + k + ']');
+        Object.keys(vars).forEach(function(k) {
+          const re = new RegExp('\\{\\{\\s*' + cgenEscapeRegex(k) + '\\s*\\}\\}', 'g');
+          body = body.replace(re, vars[k] || '[' + k + ']');
         });
-
         get('cgen-output').value = cgenFormatPlainText(body);
       }
 
-      // ── Copy ──────────────────────────────────────────────────────────────
       function cgenCopy() {
         const ta = get('cgen-output');
         const textToCopy = ta.value;
@@ -7947,10 +7912,9 @@ Best regards`;
         try { document.execCommand('copy'); } catch(e) { navigator.clipboard && navigator.clipboard.writeText(textToCopy); }
         const fb = get('cgen-copy-feedback');
         fb.classList.add('show');
-        setTimeout(() => fb.classList.remove('show'), 1800);
+        setTimeout(function() { fb.classList.remove('show'); }, 1800);
       }
 
-      // ── Add template form: custom field rows ──────────────────────────────
       function cgenRenderTplCustomFieldRows() {
         const wrap = get('cgen-tpl-custom-fields');
         wrap.innerHTML = '';
@@ -7958,7 +7922,7 @@ Best regards`;
           const div = document.createElement('div');
           div.className = 'cgen-custom-field-row';
           div.innerHTML =
-            '<input class="cgen-input" placeholder="Field Label (e.g. Bonus Terms)" value="' + (row.label||'') + '" data-i="' + i + '" data-role="label" />' +
+            '<input class="cgen-input" placeholder="Field Label (e.g. Bonus Terms)" value="' + escapeHtml(row.label || '') + '" data-i="' + i + '" data-role="label" />' +
             '<select class="cgen-select" data-i="' + i + '" data-role="type" style="padding:7px 6px;">' +
               ['text','number','date','textarea'].map(function(t) {
                 return '<option value="' + t + '"' + (row.inputType === t ? ' selected' : '') + '>' + t + '</option>';
@@ -7967,131 +7931,156 @@ Best regards`;
             '<button class="cgen-remove-btn" data-i="' + i + '" title="Remove">✕</button>';
           wrap.appendChild(div);
         });
-        // Wire events
         wrap.querySelectorAll('input[data-role="label"]').forEach(function(el) {
           el.addEventListener('input', function() {
-            const i = parseInt(el.dataset.i);
+            const i = parseInt(el.dataset.i, 10);
             const raw = el.value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_');
             tplCustomFieldRows[i].label = el.value;
-            tplCustomFieldRows[i].key   = raw || ('FIELD_' + i);
+            tplCustomFieldRows[i].key = raw || ('FIELD_' + i);
           });
         });
         wrap.querySelectorAll('select[data-role="type"]').forEach(function(el) {
           el.addEventListener('change', function() {
-            tplCustomFieldRows[parseInt(el.dataset.i)].inputType = el.value;
+            tplCustomFieldRows[parseInt(el.dataset.i, 10)].inputType = el.value;
           });
         });
         wrap.querySelectorAll('.cgen-remove-btn').forEach(function(el) {
           el.addEventListener('click', function() {
-            tplCustomFieldRows.splice(parseInt(el.dataset.i), 1);
+            tplCustomFieldRows.splice(parseInt(el.dataset.i, 10), 1);
             cgenRenderTplCustomFieldRows();
           });
         });
       }
 
-      // ── Saved templates list ──────────────────────────────────────────────
+      function cgenOpenEditTemplate(templateId) {
+        const tpl = customTemplates.find(function(item) { return item.id === templateId; });
+        if (!tpl) return;
+        get('cgen-editing-tpl-id').value = tpl.id;
+        get('cgen-add-tpl-title-text').textContent = 'Edit Custom Template';
+        get('cgen-tpl-name').value = tpl.name || '';
+        tplTypeCombo.setValue(tpl.type || '');
+        get('cgen-tpl-body').value = tpl.body || '';
+        tplCustomFieldRows = (tpl.customFields || []).map(function(field, idx) {
+          return {
+            label: field.label || '',
+            key: field.key || ('FIELD_' + idx),
+            inputType: field.inputType || 'text'
+          };
+        });
+        cgenRenderTplCustomFieldRows();
+        get('cgen-add-tpl-panel').classList.remove('hidden');
+      }
+
       function cgenRenderSavedTpls() {
         const wrap = get('cgen-saved-tpls-wrap');
         const list = get('cgen-tpl-list');
-        if (!customTemplates.length) { wrap.style.display = 'none'; return; }
+        if (!customTemplates.length) { wrap.style.display = 'none'; list.innerHTML = ''; return; }
         wrap.style.display = 'block';
         list.innerHTML = '';
         customTemplates.forEach(function(t) {
           const div = document.createElement('div');
           div.className = 'cgen-tpl-item';
           div.innerHTML =
-            '<span><span class="cgen-tpl-item-name">' + t.name + '</span> &nbsp; <span class="cgen-tpl-item-type">' + t.type + '</span></span>' +
-            '<button class="cgen-tpl-del-btn" data-id="' + t.id + '" title="Delete template">✕</button>';
+            '<span><span class="cgen-tpl-item-name">' + escapeHtml(t.name) + '</span> &nbsp; <span class="cgen-tpl-item-type">' + escapeHtml(t.type) + '</span></span>' +
+            '<span style="display:flex;gap:6px;">' +
+              '<button class="btn btn-ghost cgen-tpl-edit-btn" data-id="' + t.id + '" title="Edit template" style="font-size:11px;padding:4px 8px;">Edit</button>' +
+              '<button class="cgen-tpl-del-btn" data-id="' + t.id + '" title="Delete template">✕</button>' +
+            '</span>';
           list.appendChild(div);
+        });
+        list.querySelectorAll('.cgen-tpl-edit-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            cgenOpenEditTemplate(btn.dataset.id);
+          });
         });
         list.querySelectorAll('.cgen-tpl-del-btn').forEach(function(btn) {
           btn.addEventListener('click', function() {
             if (!confirm('Delete this template?')) return;
-            customTemplates = customTemplates.filter(t => t.id !== btn.dataset.id);
+            customTemplates = customTemplates.filter(function(t) { return t.id !== btn.dataset.id; });
             cgenSaveSaved(customTemplates);
             cgenRenderSavedTpls();
+            cgenPopulateTypeSelect();
+            cgenPopulateTplTypeSelect();
             cgenPopulateTemplateSelect();
+            cgenRenderCustomVarFields();
+            if (typeof refreshContractTypeOptions === 'function') refreshContractTypeOptions();
           });
         });
       }
 
-      // ── Save custom template ──────────────────────────────────────────────
       function cgenSaveTemplate() {
+        const editingId = (get('cgen-editing-tpl-id').value || '').trim();
         const name = (get('cgen-tpl-name').value || '').trim();
-        const type = get('cgen-tpl-type').value;
+        const type = tplTypeCombo.getValue();
         const body = (get('cgen-tpl-body').value || '').trim();
-        const fb   = get('cgen-tpl-feedback');
+        const fb = get('cgen-tpl-feedback');
         if (!name) { fb.textContent = 'Template name required.'; fb.className = 'cgen-feedback error'; return; }
+        if (!type) { fb.textContent = 'Contract type required.'; fb.className = 'cgen-feedback error'; return; }
         if (!body) { fb.textContent = 'Template body required.'; fb.className = 'cgen-feedback error'; return; }
-        const newTpl = {
-          id: 'custom_' + Date.now(),
-          name, type, body,
-          customFields: tplCustomFieldRows.map(function(r) {
-            return { label: r.label || 'Field', key: (r.label||'FIELD').toUpperCase().replace(/[^A-Z0-9_]/g,'_'), inputType: r.inputType || 'text' };
+        const payload = {
+          id: editingId || ('custom_' + Date.now()),
+          name: name,
+          type: type,
+          body: body,
+          customFields: tplCustomFieldRows.map(function(r, index) {
+            const label = (r.label || '').trim() || ('Field ' + (index + 1));
+            return { label: label, key: label, inputType: r.inputType || 'text' };
           })
         };
-        customTemplates.push(newTpl);
+        if (editingId) {
+          customTemplates = customTemplates.map(function(t) { return t.id === editingId ? payload : t; });
+        } else {
+          customTemplates.push(payload);
+        }
         cgenSaveSaved(customTemplates);
         cgenRenderSavedTpls();
+        cgenPopulateTypeSelect();
+        cgenPopulateTplTypeSelect();
+        get('cgen-type-select').value = payload.type;
         cgenPopulateTemplateSelect();
-        // Reset form
-        get('cgen-tpl-name').value = '';
-        get('cgen-tpl-body').value = '';
-        tplCustomFieldRows = [];
-        cgenRenderTplCustomFieldRows();
-        fb.textContent = '✓ Template saved.'; fb.className = 'cgen-feedback ok';
-        setTimeout(() => { fb.textContent = ''; }, 2500);
+        get('cgen-template-select').value = 'custom:' + payload.id;
+        cgenRenderCustomVarFields();
+        cgenResetTemplateForm();
+        get('cgen-add-tpl-panel').classList.add('hidden');
+        fb.textContent = '✓ Template saved.';
+        fb.className = 'cgen-feedback ok';
+        if (typeof refreshContractTypeOptions === 'function') refreshContractTypeOptions();
       }
 
-      // ── Init ──────────────────────────────────────────────────────────────
       function cgenInit() {
-        // Initial population
+        cgenPopulateTypeSelect();
+        cgenPopulateTplTypeSelect();
         cgenPopulateTemplateSelect();
-        cgenRenderTypeFields();
         cgenRenderSavedTpls();
+        cgenRenderCustomVarFields();
 
-        // Type change
         get('cgen-type-select').addEventListener('change', function() {
           cgenPopulateTemplateSelect();
-          cgenRenderTypeFields();
           cgenRenderCustomVarFields();
         });
-
-        // Template change
         get('cgen-template-select').addEventListener('change', function() {
           cgenRenderCustomVarFields();
         });
-
-        // Generate
         get('cgen-generate-btn').addEventListener('click', cgenGenerate);
-
-        // Copy
         get('cgen-copy-btn').addEventListener('click', cgenCopy);
-
-        // Show/hide add template panel
         get('cgen-show-add-tpl-btn').addEventListener('click', function() {
-          const panel = get('cgen-add-tpl-panel');
-          panel.classList.toggle('hidden');
+          cgenResetTemplateForm();
+          get('cgen-add-tpl-panel').classList.toggle('hidden');
         });
         get('cgen-add-tpl-close').addEventListener('click', function() {
           get('cgen-add-tpl-panel').classList.add('hidden');
+          cgenResetTemplateForm();
         });
         get('cgen-cancel-tpl-btn').addEventListener('click', function() {
           get('cgen-add-tpl-panel').classList.add('hidden');
+          cgenResetTemplateForm();
         });
-
-        // Add custom field row in add-template form
         get('cgen-tpl-add-field-btn').addEventListener('click', function() {
           tplCustomFieldRows.push({ label: '', key: '', inputType: 'text' });
           cgenRenderTplCustomFieldRows();
         });
-
-        // Save template
         get('cgen-save-tpl-btn').addEventListener('click', cgenSaveTemplate);
-
-        // Default date to today
-        const today = todayYMDLocal();
-        get('cgen-f-date').value = today;
+        if (typeof refreshContractTypeOptions === 'function') refreshContractTypeOptions();
       }
 
       cgenInit();
@@ -8147,8 +8136,7 @@ Best regards`;
       reReleaseDate,
       aeDueDate,
       aeCompletedDate,
-      elActionDue,
-      document.getElementById('cgen-f-date')
+      elActionDue
     ].forEach(applyDateInputGuard);
     // ── END BOOT (v36d) ───────────────────────────────────────────────────
   </script>
