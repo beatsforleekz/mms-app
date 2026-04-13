@@ -401,6 +401,14 @@ textarea {
   border-bottom: 1px solid var(--border);
   text-align: left;
   font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catalogue-table th > *,
+.catalogue-table td > * {
+  min-width: 0;
 }
 
 .catalogue-table th {

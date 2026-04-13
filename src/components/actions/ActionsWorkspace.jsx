@@ -399,7 +399,7 @@ export default function ActionsWorkspace() {
                             {actionTodayBool(action.to_do_today) ? <span className="actions-today-flag">TODAY</span> : null}
                             <div className="actions-title-line" title={action.title || '—'}>{action.title || '—'}</div>
                           </div>
-                          <div className="actions-meta-line" title={meta || ''}>{meta || '—'}</div>
+                          <div className="actions-meta-line" title={meta || ''}>{meta || ''}</div>
                         </div>
                         <div className="actions-marker-cell">
                           <span className={`actions-marker ${visibilityValue(action.visibility) === 'Personal' ? 'personal' : 'shared'}`}>

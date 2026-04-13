@@ -566,6 +566,16 @@
       padding: 10px 12px; border-bottom: 1px solid var(--border);
       color: var(--text); vertical-align: middle;
     }
+    .contracts-release-cell {
+      max-width: 220px;
+    }
+    .contracts-release-text {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .contracts-table tbody tr:last-child td { border-bottom: none; }
     .contracts-table tbody tr:hover td { background: #f8f9ff; cursor: pointer; }
     .contracts-table tbody tr.editing td { background: var(--accent-lt); }
@@ -4896,7 +4906,7 @@
 
       elContractsTbody.innerHTML = '';
       rows.forEach(function(c) {
-      const relTitle = contractLinkedReleaseLabel(c) || '<span class="no-release-warn">⚠ No release linked</span>';
+      const relTitle = contractLinkedReleaseLabel(c) || '';
         const ne = escapeHtml(c.notes || '');
         const payeesText = payeesSummary(c);
         const participates = contractParticipatesInRoyalties(c);
@@ -4915,7 +4925,7 @@
           '<td><input type="checkbox" data-contract-select="' + contractIdStr + '"' + checkedAttr + ' aria-label="Select contract" /></td>'+
           '<td><strong>'+escapeHtml(c.title||'—')+'</strong></td>'+
           '<td>'+escapeHtml(c.contract_type||'—')+nonRoyaltyChip+'</td>'+
-          '<td>'+ (relTitle.indexOf('<span') === 0 ? relTitle : escapeHtml(relTitle)) +'</td>'+
+          '<td class="contracts-release-cell" title="'+escapeHtml(relTitle || 'No release linked')+'">'+(relTitle ? '<span class="contracts-release-text">'+escapeHtml(relTitle)+'</span>' : '<span class="no-release-warn contracts-release-text">⚠ No release linked</span>')+'</td>'+
           '<td>'+contractStatusBadge(c.status)+'</td>'+
           '<td style="font-size:12px;">'+escapeHtml(c.sending_party||'—')+'</td>'+
           '<td style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHtml(payeesText||'—')+'">'+(contractNeedsRoyaltyShares(c) ? escapeHtml(payeesText||'—') : '—')+'</td>'+

@@ -154,6 +154,8 @@ function CatalogueTable({
   deleting,
   search,
   onSearchChange,
+  sortOrder,
+  onSortChange,
   onExport
 }) {
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
@@ -172,6 +174,11 @@ function CatalogueTable({
           placeholder={type === 'publishing' ? 'Search title or writer…' : 'Search artist or title…'}
           style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
         />
+        <select className="shell-btn" value={sortOrder} onChange={(event) => onSortChange(event.target.value)} aria-label="Sort catalogue">
+          <option value="az">A–Z</option>
+          <option value="za">Z–A</option>
+          <option value="recent">Recently Added</option>
+        </select>
         <button type="button" className="shell-btn" onClick={onExport}>
           Export
         </button>
@@ -227,18 +234,18 @@ function CatalogueTable({
                     </td>
                     {type === 'publishing' ? (
                       <>
-                        <td><strong>{row.work_title || '—'}</strong></td>
-                        <td>{row.writers || '—'}</td>
-                        <td>{row.tempo_id || '—'}</td>
-                        <td>{row.iswc || '—'}</td>
+                        <td title={row.work_title || ''}><strong>{row.work_title || '—'}</strong></td>
+                        <td title={row.writers || ''}>{row.writers || '—'}</td>
+                        <td title={row.tempo_id || ''}>{row.tempo_id || '—'}</td>
+                        <td title={row.iswc || ''}>{row.iswc || '—'}</td>
                       </>
                     ) : (
                       <>
-                        <td><strong>{row.artist || '—'}</strong></td>
-                        <td>{row.track_title || '—'}</td>
-                        <td>{row.version || '—'}</td>
-                        <td>{row.release_title || '—'}</td>
-                        <td>{row.isrc || '—'}</td>
+                        <td title={row.artist || ''}><strong>{row.artist || '—'}</strong></td>
+                        <td title={row.track_title || ''}>{row.track_title || '—'}</td>
+                        <td title={row.version || ''}>{row.version || '—'}</td>
+                        <td title={row.release_title || ''}>{row.release_title || '—'}</td>
+                        <td title={row.isrc || ''}>{row.isrc || '—'}</td>
                       </>
                     )}
                     <td>
@@ -297,6 +304,7 @@ export default function CatalogueTables() {
   const [fetching, setFetching] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState('');
+  const [sortOrder, setSortOrder] = useState('az');
   const [showAddForm, setShowAddForm] = useState(false);
   const [savingManual, setSavingManual] = useState(false);
   const [manualValues, setManualValues] = useState({});
@@ -312,11 +320,16 @@ export default function CatalogueTables() {
       return `${row.artist || ''} ${row.track_title || ''}`.toLowerCase().includes(lowered);
     }).slice();
     next.sort((a, b) => {
-      if (activeType === 'publishing') return `${a.work_title} ${a.writers}`.localeCompare(`${b.work_title} ${b.writers}`);
-      return `${a.artist} ${a.track_title}`.localeCompare(`${b.artist} ${b.track_title}`);
+      if (sortOrder === 'recent') {
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+      const left = activeType === 'publishing' ? (a.work_title || '') : (a.track_title || '');
+      const right = activeType === 'publishing' ? (b.work_title || '') : (b.track_title || '');
+      const base = left.localeCompare(right, undefined, { sensitivity: 'base' });
+      return sortOrder === 'za' ? -base : base;
     });
     return next;
-  }, [rows, activeType, search]);
+  }, [rows, activeType, search, sortOrder]);
 
   function exportCsvFile(filenameBase, headers, dataRows) {
     const escapeCell = (value) => {
@@ -601,6 +614,8 @@ export default function CatalogueTables() {
         deleting={deleting}
         search={search}
         onSearchChange={setSearch}
+        sortOrder={sortOrder}
+        onSortChange={setSortOrder}
         onExport={handleExport}
       />
     </section>
