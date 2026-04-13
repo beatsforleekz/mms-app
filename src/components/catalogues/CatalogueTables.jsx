@@ -8,6 +8,7 @@ import {
   createCataloguePipelineEntry,
   deleteLabelCatalogueRows,
   deletePublishingCatalogueRows,
+  fetchCataloguePipelineLinks,
   fetchLabelCatalogue,
   fetchPublishingCatalogue,
   hasPipelineLink,
@@ -357,9 +358,13 @@ export default function CatalogueTables() {
   async function loadActiveCatalogue(type = activeType) {
     setFetching(true);
     try {
-      const nextRows = type === 'publishing' ? await fetchPublishingCatalogue() : await fetchLabelCatalogue();
+      const [nextRows, pipelineLinks] = await Promise.all([
+        type === 'publishing' ? fetchPublishingCatalogue() : fetchLabelCatalogue(),
+        fetchCataloguePipelineLinks()
+      ]);
       setRows(nextRows);
-      setLinkedIds(new Set(nextRows.filter((row) => hasPipelineLink(type, row.id)).map((row) => row.id)));
+      const linkedLookup = new Set((pipelineLinks || []).filter((row) => row.catalogue_type === type).map((row) => row.catalogue_id));
+      setLinkedIds(new Set(nextRows.filter((row) => linkedLookup.has(row.id)).map((row) => row.id)));
       setSelectedIds(new Set());
     } finally {
       setFetching(false);
@@ -500,7 +505,7 @@ export default function CatalogueTables() {
     setError('');
     setMessage('');
     try {
-      createCataloguePipelineEntry(activeType, rowId, 'New', row);
+      await createCataloguePipelineEntry(activeType, rowId, 'New', row);
       setLinkedIds((prev) => {
         const next = new Set(prev);
         next.add(rowId);

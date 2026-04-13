@@ -336,6 +336,24 @@ export function getCataloguePipelineLinks() {
   })).filter((row) => row.catalogue_id && row.catalogue_type && (row.id || row.release_id));
 }
 
+export async function fetchCataloguePipelineLinks() {
+  const db = getSupabaseClient();
+  const { data, error } = await db
+    .from('catalogue_pipeline_links')
+    .select('id, catalogue_id, catalogue_type, status')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  const rows = (data || []).map((row) => ({
+    id: normalizeText(row.id || row.release_id),
+    release_id: normalizeText(row.release_id),
+    catalogue_id: normalizeText(row.catalogue_id),
+    catalogue_type: normalizeText(row.catalogue_type),
+    status: normalizeText(row.status) || 'New'
+  })).filter((row) => row.catalogue_id && row.catalogue_type && row.id);
+  writeStorageArray(PIPELINE_LINKS_STORAGE_KEY, rows);
+  return rows;
+}
+
 export function saveCataloguePipelineLink(link) {
   const next = getCataloguePipelineLinks();
   const catalogueType = normalizeText(link.catalogue_type).toLowerCase() === 'publishing' ? 'publishing' : 'label';
@@ -368,7 +386,7 @@ export function getCatalogueRow(catalogueType, catalogueId) {
   return rows.find((row) => row.id === normalizedId) || null;
 }
 
-export function createCataloguePipelineEntry(catalogueType, catalogueId, status = 'New', sourceRow = null) {
+export async function createCataloguePipelineEntry(catalogueType, catalogueId, status = 'New', sourceRow = null) {
   const normalizedType = normalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
   const normalizedId = normalizeText(catalogueId);
   const resolvedSource = sourceRow || getCatalogueRow(normalizedType, normalizedId);
@@ -385,6 +403,11 @@ export function createCataloguePipelineEntry(catalogueType, catalogueId, status 
     catalogue_type: normalizedType,
     status: normalizeText(status) || 'New'
   };
-  saveCataloguePipelineLink(entry);
+  const db = getSupabaseClient();
+  const { error } = await db
+    .from('catalogue_pipeline_links')
+    .upsert(entry, { onConflict: 'id' });
+  if (error) throw error;
+  await fetchCataloguePipelineLinks();
   return entry;
 }

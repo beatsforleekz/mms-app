@@ -2056,6 +2056,16 @@
           </div>
         </div>
         <hr class="divider" />
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span style="font-size:12px;color:var(--muted);font-weight:600;">View:</span>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn btn-ghost" id="actions-view-both-btn" type="button">Shared + Mine</button>
+              <button class="btn btn-ghost" id="actions-view-shared-btn" type="button">All Shared</button>
+              <button class="btn btn-ghost" id="actions-view-mine-btn" type="button">My Tasks</button>
+            </div>
+          </div>
+        </div>
 
         <!-- Action edit / add panel (hidden by default) -->
         <div class="action-edit-panel hidden" id="action-edit-panel">
@@ -2101,6 +2111,13 @@
                 <option value="Chase">Chase</option>
                 <option value="blocked">Blocked</option>
                 <option value="done">Done</option>
+              </select>
+            </div>
+            <div class="action-edit-field">
+              <label class="action-edit-label" for="ae-visibility">Task Type</label>
+              <select class="action-edit-select" id="ae-visibility">
+                <option value="Shared">Shared</option>
+                <option value="Personal">Personal</option>
               </select>
             </div>
             <div class="action-edit-field">
@@ -2647,9 +2664,22 @@
     const SUPABASE_URL      = 'https://mzzwkqquvrupxagfsnqm.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_50qTJH-gY--FKXu4babiog_WI1iMJ5k';
     let db = null;
+    let currentLegacyUserId = '';
     if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-      db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+      db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
       console.log('[Leah Ops] Supabase ready (no-auth).');
+    }
+
+    async function fetchLegacyCurrentUser() {
+      if (!db || !db.auth) { currentLegacyUserId = ''; return ''; }
+      try {
+        const { data, error } = await db.auth.getUser();
+        if (error) throw error;
+        currentLegacyUserId = data && data.user && data.user.id ? String(data.user.id) : '';
+      } catch (err) {
+        currentLegacyUserId = '';
+      }
+      return currentLegacyUserId;
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -2864,6 +2894,7 @@
     const PIPELINE_REFERENCE_STORAGE_KEY = 'catalogue_pipeline_links';
     let labelCatalogueData = [];
     let publishingCatalogueData = [];
+    let pipelineReferenceEntriesCache = [];
 
     function lsReadArray(key) {
       try {
@@ -2923,8 +2954,8 @@
       publishingCatalogueData = (publishingRes.data || []).map(normalizePublishingCatalogueRow).filter(function(row) { return row.id; });
     }
 
-    function getPipelineReferenceEntries() {
-      return lsReadArray(PIPELINE_REFERENCE_STORAGE_KEY).map(function(row) {
+    function normalizePipelineReferenceEntries(rows) {
+      return (rows || []).map(function(row) {
         const type = catalogueNormalizeText(row && row.catalogue_type).toLowerCase() === 'publishing' ? 'publishing' : 'label';
         const catalogueId = catalogueNormalizeText(row && row.catalogue_id);
         return {
@@ -2938,8 +2969,22 @@
       });
     }
 
-    function savePipelineReferenceEntries(entries) {
-      lsWriteArray(PIPELINE_REFERENCE_STORAGE_KEY, entries);
+    function getPipelineReferenceEntries() {
+      return pipelineReferenceEntriesCache.slice();
+    }
+
+    async function fetchPipelineReferenceEntries() {
+      if (!db) {
+        pipelineReferenceEntriesCache = normalizePipelineReferenceEntries(lsReadArray(PIPELINE_REFERENCE_STORAGE_KEY));
+        return getPipelineReferenceEntries();
+      }
+      const { data, error } = await db
+        .from('catalogue_pipeline_links')
+        .select('id,catalogue_id,catalogue_type,status')
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      pipelineReferenceEntriesCache = normalizePipelineReferenceEntries(data || []);
+      return getPipelineReferenceEntries();
     }
 
     function resolveCatalogueRow(catalogueType, catalogueId) {
@@ -2959,7 +3004,7 @@
       });
     }
 
-    function createPipelineReferenceEntry(catalogueType, catalogueId, status) {
+    async function createPipelineReferenceEntry(catalogueType, catalogueId, status) {
       const type = catalogueNormalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
       const id = catalogueNormalizeText(catalogueId);
       const source = resolveCatalogueRow(type, id);
@@ -2968,25 +3013,42 @@
         throw new Error('Missing catalogue data');
       }
       const entryId = 'catalogue:' + type + ':' + id;
-      const entries = getPipelineReferenceEntries();
-      if (!entries.some(function(entry) { return entry.id === entryId; })) {
-        entries.push({
-          id: entryId,
-          catalogue_id: id,
-          catalogue_type: type,
-          status: catalogueNormalizeText(status) || 'New'
-        });
-        savePipelineReferenceEntries(entries);
+      const nextEntry = {
+        id: entryId,
+        catalogue_id: id,
+        catalogue_type: type,
+        status: catalogueNormalizeText(status) || 'New'
+      };
+      if (!db) {
+        const entries = normalizePipelineReferenceEntries(lsReadArray(PIPELINE_REFERENCE_STORAGE_KEY));
+        if (!entries.some(function(entry) { return entry.id === entryId; })) {
+          entries.push(nextEntry);
+          lsWriteArray(PIPELINE_REFERENCE_STORAGE_KEY, entries);
+        }
+        pipelineReferenceEntriesCache = entries;
+        return entryId;
       }
+      const { error } = await db
+        .from('catalogue_pipeline_links')
+        .upsert(nextEntry, { onConflict: 'id' });
+      if (error) throw error;
+      await fetchPipelineReferenceEntries();
       return entryId;
     }
 
-    function deletePipelineReferenceEntries(ids) {
+    async function deletePipelineReferenceEntries(ids) {
       const idSet = new Set((ids || []).map(function(id) { return String(id); }));
-      const next = getPipelineReferenceEntries().filter(function(entry) {
-        return !idSet.has(String(entry.id));
-      });
-      savePipelineReferenceEntries(next);
+      if (!db) {
+        const next = normalizePipelineReferenceEntries(lsReadArray(PIPELINE_REFERENCE_STORAGE_KEY)).filter(function(entry) {
+          return !idSet.has(String(entry.id));
+        });
+        lsWriteArray(PIPELINE_REFERENCE_STORAGE_KEY, next);
+        pipelineReferenceEntriesCache = next;
+        return;
+      }
+      const { error } = await db.from('catalogue_pipeline_links').delete().in('id', Array.from(idSet));
+      if (error) throw error;
+      await fetchPipelineReferenceEntries();
     }
 
     function buildPipelineReferenceRow(entry) {
@@ -3399,6 +3461,7 @@
       relShowLoading();
       try {
         await fetchCatalogueLookupData();
+        await fetchPipelineReferenceEntries();
         const pipelineRows = getPipelineReferenceEntries().map(buildPipelineReferenceRow);
         dbg.fetchStatus('Loaded from catalogue references','debug-ok');
         dbg.rowCount(String(pipelineRows.length), pipelineRows.length>0?'debug-ok':'debug-warn');
@@ -3464,7 +3527,7 @@
             e.stopPropagation();
             if (!confirm('Delete release "' + (titleDisplay||r.id) + '"?\n\nThis will permanently remove it from the pipeline. This cannot be undone.')) return;
             try {
-              deletePipelineReferenceEntries([r.id]);
+              await deletePipelineReferenceEntries([r.id]);
               selectedReleaseIds.delete(String(r.id));
               await releaseTableRefresh();
               populateAssetsReleaseDropdown(currentReleasesData);
@@ -5117,7 +5180,7 @@
         if (!alreadyLinked) {
           row.addEventListener('click', async function() {
             try {
-              createPipelineReferenceEntry(item.catalogue_type, item.catalogue_id, 'New');
+              await createPipelineReferenceEntry(item.catalogue_type, item.catalogue_id, 'New');
               setReleaseStartFeedback('✓ Added to pipeline', 'ok');
               await releaseTableRefresh();
               renderReleaseStartResults();
@@ -5263,6 +5326,9 @@
     const elActionsError   = document.getElementById('actions-error');
     const elActionsEmpty   = document.getElementById('actions-empty');
     const elActionList     = document.getElementById('action-list');
+    const elActionsViewBothBtn = document.getElementById('actions-view-both-btn');
+    const elActionsViewSharedBtn = document.getElementById('actions-view-shared-btn');
+    const elActionsViewMineBtn = document.getElementById('actions-view-mine-btn');
 
     // Quick-add bar elements (kept from v29 for fast entry)
     const elActionTitle   = document.getElementById('action-title-input');
@@ -5282,12 +5348,14 @@
     const aeReleaseId      = document.getElementById('ae-release-id');
     const aePriority       = document.getElementById('ae-priority');
     const aeStatus         = document.getElementById('ae-status');
+    const aeVisibility     = document.getElementById('ae-visibility');
     const aeDueDate        = document.getElementById('ae-due-date');
     const aeCompletedDate  = document.getElementById('ae-completed-date');
     const aeToDoToday      = document.getElementById('ae-to-do-today');
     const aeNotes          = document.getElementById('ae-notes');
 
     let allActions = [];
+    let actionsViewMode = 'both';
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -5362,6 +5430,43 @@
       return dt ? dt.getTime() : Number.MAX_SAFE_INTEGER;
     }
 
+    function actionVisibilityValue(value) {
+      return String(value || '').toLowerCase() === 'personal' ? 'Personal' : 'Shared';
+    }
+
+    function actionCanView(actionLike) {
+      const visibility = actionVisibilityValue(actionLike && actionLike.visibility);
+      const ownerUserId = String(actionLike && actionLike.owner_user_id || '');
+      if (visibility !== 'Personal') return true;
+      return !!currentLegacyUserId && ownerUserId === currentLegacyUserId;
+    }
+
+    function actionMatchesView(actionLike) {
+      const visibility = actionVisibilityValue(actionLike && actionLike.visibility);
+      if (actionsViewMode === 'shared') return visibility === 'Shared';
+      if (actionsViewMode === 'mine') {
+        if (visibility === 'Shared') return false;
+        return actionCanView(actionLike);
+      }
+      if (visibility === 'Shared') return true;
+      return actionCanView(actionLike);
+    }
+
+    function updateActionsViewButtons() {
+      var configs = [
+        { el: elActionsViewBothBtn, mode: 'both' },
+        { el: elActionsViewSharedBtn, mode: 'shared' },
+        { el: elActionsViewMineBtn, mode: 'mine' }
+      ];
+      configs.forEach(function(item) {
+        if (!item.el) return;
+        var active = actionsViewMode === item.mode;
+        item.el.style.background = active ? 'var(--accent-lt)' : '';
+        item.el.style.borderColor = active ? 'var(--accent)' : '';
+        item.el.style.color = active ? 'var(--accent)' : '';
+      });
+    }
+
     function compareActionsForList(a, b) {
       const aToday = actionTodayBool(a && a.to_do_today) ? 0 : 1;
       const bToday = actionTodayBool(b && b.to_do_today) ? 0 : 1;
@@ -5386,6 +5491,7 @@
       if (aeReleaseId)     aeReleaseId.value = '';
       if (aePriority)      aePriority.value = '';
       if (aeStatus)        aeStatus.value = 'open';
+      if (aeVisibility)    aeVisibility.value = 'Shared';
       setDateInputValue(aeDueDate, '');
       setDateInputValue(aeCompletedDate, '');
       if (aeToDoToday)     aeToDoToday.checked = false;
@@ -5404,6 +5510,7 @@
         if (aeReleaseId)     aeReleaseId.value = a.release_id ? String(a.release_id) : '';
         if (aePriority)      aePriority.value = a.priority || '';
         if (aeStatus)        aeStatus.value = a.status || 'open';
+        if (aeVisibility)    aeVisibility.value = actionVisibilityValue(a.visibility);
         setDateInputValue(aeDueDate, a.due_date);
         setDateInputValue(aeCompletedDate, a.completed_date);
         if (aeToDoToday)     aeToDoToday.checked = actionTodayBool(a.to_do_today);
@@ -5436,6 +5543,15 @@
     const elActionNewBtn = document.getElementById('action-new-btn');
     if (elActionNewBtn) {
       elActionNewBtn.addEventListener('click', function() { openActionEditPanel(null); });
+    }
+    if (elActionsViewBothBtn) {
+      elActionsViewBothBtn.addEventListener('click', function() { actionsViewMode = 'both'; renderActionList(); });
+    }
+    if (elActionsViewSharedBtn) {
+      elActionsViewSharedBtn.addEventListener('click', function() { actionsViewMode = 'shared'; renderActionList(); });
+    }
+    if (elActionsViewMineBtn) {
+      elActionsViewMineBtn.addEventListener('click', function() { actionsViewMode = 'mine'; renderActionList(); });
     }
 
     const elActionEditCloseBtn = document.getElementById('action-edit-close-btn');
@@ -5473,6 +5589,8 @@
         setActionFeedback('Saving…', '');
 
         const id = aeId ? aeId.value : '';
+        const visibility = actionVisibilityValue(aeVisibility ? aeVisibility.value : 'Shared');
+        if (visibility === 'Personal' && !currentLegacyUserId) await fetchLegacyCurrentUser();
 
         const payload = {
           title:          title,
@@ -5485,6 +5603,8 @@
           completed_date: completedDateCheck.value || null,
           to_do_today:    aeToDoToday ? aeToDoToday.checked : false,
           notes:          (aeNotes         ? aeNotes.value.trim()         : null) || null,
+          visibility:     visibility,
+          owner_user_id:  visibility === 'Personal' ? (currentLegacyUserId || null) : null
         };
 
         try {
@@ -5518,8 +5638,10 @@
       if (!elActionList) return;
       elActionList.innerHTML = '';
       currentVisibleActions = [];
+      updateActionsViewButtons();
+      const visibleActions = allActions.filter(actionMatchesView);
 
-      if (allActions.length === 0) {
+      if (visibleActions.length === 0) {
         syncSelectAllCheckbox([], selectedActionIds, 'actions-select-all');
         updateBulkBar('actions-bulk-bar', 'actions-bulk-count', selectedActionIds);
         if (elActionsEmpty) elActionsEmpty.style.display = 'flex';
@@ -5540,7 +5662,7 @@
       ];
 
       groups.forEach(function(groupDef) {
-        const items = allActions.filter(function(a) {
+        const items = visibleActions.filter(function(a) {
           const st = String(a.status || 'open');
           return groupDef.key === 'Chase' ? st === 'Chase' : st.toLowerCase() === groupDef.key.toLowerCase();
         }).slice().sort(compareActionsForList);
@@ -5574,7 +5696,7 @@
             if (selectChk.checked) selectedActionIds.add(String(a.id));
             else selectedActionIds.delete(String(a.id));
             updateBulkBar('actions-bulk-bar', 'actions-bulk-count', selectedActionIds);
-            syncSelectAllCheckbox(allActions.map(function(item) { return item.id; }), selectedActionIds, 'actions-select-all');
+            syncSelectAllCheckbox(currentVisibleActions.map(function(item) { return item.id; }), selectedActionIds, 'actions-select-all');
           });
           selectWrap.appendChild(selectChk);
 
@@ -5590,10 +5712,14 @@
           const titleWrap = document.createElement('div');
           titleWrap.className = 'action-title';
           const relatedStr = [a.related_to, a.reference_name, releaseTitle].filter(Boolean).join(' · ');
+          const visibilityTag = actionVisibilityValue(a.visibility) === 'Personal'
+            ? '<span style="font-size:10px;font-weight:700;color:#7c3aed;margin-left:6px;">PERSONAL</span>'
+            : '<span style="font-size:10px;font-weight:700;color:var(--muted);margin-left:6px;">SHARED</span>';
           titleWrap.innerHTML =
             '<span class="action-title-text">' + escapeHtml(a.title||'—') + '</span>' +
             (relatedStr ? '<br><span style="font-size:11px;color:var(--muted);">' + escapeHtml(relatedStr) + '</span>' : '') +
-            (actionTodayBool(a.to_do_today) ? '<span style="font-size:10px;font-weight:700;color:var(--accent);margin-left:6px;">TODAY</span>' : '');
+            (actionTodayBool(a.to_do_today) ? '<span style="font-size:10px;font-weight:700;color:var(--accent);margin-left:6px;">TODAY</span>' : '') +
+            visibilityTag;
 
           const priWrap = document.createElement('div');
           priWrap.style.cssText = 'padding:10px 8px;';
@@ -5638,7 +5764,7 @@
 
       renderDashboardActions();
       updateBulkBar('actions-bulk-bar', 'actions-bulk-count', selectedActionIds);
-      syncSelectAllCheckbox(allActions.map(function(item) { return item.id; }), selectedActionIds, 'actions-select-all');
+      syncSelectAllCheckbox(currentVisibleActions.map(function(item) { return item.id; }), selectedActionIds, 'actions-select-all');
     }
 
     // ── data functions ────────────────────────────────────────────────────────
@@ -5656,9 +5782,10 @@
       }
 
       try {
+        await fetchLegacyCurrentUser();
         const { data, error } = await db
           .from('actions')
-          .select('id,title,related_to,reference_name,notes,due_date,priority,to_do_today,status,completed_date,done_sort,due_sort,release_id')
+          .select('id,title,related_to,reference_name,notes,due_date,priority,to_do_today,status,completed_date,done_sort,due_sort,release_id,visibility,owner_user_id')
           .order('status', { ascending: true })
           .order('due_date', { ascending: true, nullsFirst: false })
           .order('created_at', { ascending: false })
@@ -5678,9 +5805,11 @@
           const normStatus = rawStatus === 'Chase' ? 'Chase' : rawStatus.toLowerCase();
           return Object.assign({}, a, {
             status: normStatus,
-            to_do_today: actionTodayBool(a.to_do_today)
+            to_do_today: actionTodayBool(a.to_do_today),
+            visibility: actionVisibilityValue(a.visibility),
+            owner_user_id: String(a.owner_user_id || '')
           });
-        });
+        }).filter(actionCanView);
         renderActionList();
         renderDashboardActions();
 
@@ -5722,7 +5851,7 @@
 
     async function bulkDeleteReleases(ids) {
       if (!ids.length) return;
-      deletePipelineReferenceEntries(ids);
+      await deletePipelineReferenceEntries(ids);
       ids.forEach(function(id) { selectedReleaseIds.delete(String(id)); });
       await releaseTableRefresh();
     }
@@ -5787,18 +5916,17 @@
       renderContractsTable();
     }
 
-    function stmtDeleteSelected(type) {
+    async function stmtDeleteSelected(type) {
       const selectionSet = type === 'Publishing' ? selectedStatementIndices.Publishing : selectedStatementIndices.Master;
       const ids = Array.from(selectionSet).map(function(idx) { return parseInt(idx, 10); }).filter(Number.isFinite).sort(function(a, b) { return b - a; });
       if (!ids.length) return;
       if (!confirm('Delete ' + ids.length + ' selected statement entr' + (ids.length === 1 ? 'y' : 'ies') + '?')) return;
       const arr = stmtGetEntries();
-      ids.forEach(function(idx) {
-        if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
-      });
+      const deleteIds = ids.map(function(idx) { return arr[idx] && arr[idx].id ? String(arr[idx].id) : ''; }).filter(Boolean);
+      await stmtDeleteEntriesByIds(deleteIds);
+      await stmtFetchEntriesFromDB();
       selectedStatementIndices.Master.clear();
       selectedStatementIndices.Publishing.clear();
-      stmtSaveEntries(arr);
       stmtRebuildPeriodFilter();
       stmtRenderList();
       renderDashboard();
@@ -5883,7 +6011,7 @@
         try { await bulkDeleteContracts(ids); } catch (err) { alert('Delete failed: ' + err.message); }
       });
 
-      wireSelectAll('actions-select-all', function() { return allActions.map(function(a) { return a.id; }); }, selectedActionIds, renderActionList);
+      wireSelectAll('actions-select-all', function() { return currentVisibleActions.map(function(a) { return a.id; }); }, selectedActionIds, renderActionList);
       wireClear('actions-clear-selection-btn', selectedActionIds, renderActionList);
       const actDel = document.getElementById('actions-delete-selected-btn');
       if (actDel) actDel.addEventListener('click', async function() {
@@ -5991,6 +6119,8 @@
           release_id: elActionRelease ? (elActionRelease.value || null) : null,
           due_date:   quickDueDateCheck.value || null,
           to_do_today: elActionTodayQuick ? elActionTodayQuick.checked : false,
+          visibility: 'Shared',
+          owner_user_id: null,
           status:     'open',
         };
 
@@ -6676,6 +6806,7 @@
     // ══════════════════════════════════════════════════════════════════════════
 
     const STMT_STORAGE_KEY = 'leah_statements';
+    let stmtEntriesCache = [];
     function stmtGetPeriod()          { return localStorage.getItem('leah_stmt_period') || ''; }
     function stmtSavePeriod(v)        { localStorage.setItem('leah_stmt_period', v); }
     function stmtGetFilter()          { return localStorage.getItem('leah_stmt_filter') || ''; }
@@ -6693,6 +6824,7 @@
 
     function normalizeStatementEntry(entry) {
       const normalized = Object.assign({}, entry || {});
+      normalized.id = String(normalized.id || '').trim();
       normalized.payee = String(normalized.payee || '').trim();
       normalized.type = normalized.type === 'Publishing' ? 'Publishing' : 'Master';
       normalized.period = String(normalized.period || '').trim();
@@ -6704,12 +6836,115 @@
       return normalized;
     }
 
+    function stmtDbPayload(entry) {
+      const normalized = normalizeStatementEntry(entry);
+      return {
+        payee: normalized.payee,
+        type: normalized.type,
+        period: normalized.period,
+        balance: normalized.balance,
+        last_payment: normalized.lastPayment,
+        email_sent: normalized.emailSent,
+        contract_no: normalized.contractNo || null,
+        notes: normalized.notes || null
+      };
+    }
+
+    function stmtRowFromDb(row) {
+      return normalizeStatementEntry({
+        id: row && row.id,
+        payee: row && row.payee,
+        type: row && row.type,
+        period: row && row.period,
+        balance: row && row.balance,
+        lastPayment: row && row.last_payment,
+        emailSent: row && row.email_sent,
+        contractNo: row && row.contract_no,
+        notes: row && row.notes
+      });
+    }
+
+    async function stmtFetchEntriesFromDB() {
+      if (!db) {
+        stmtEntriesCache = stmtReadStoredEntries().map(normalizeStatementEntry);
+        return stmtEntriesCache.slice();
+      }
+      const { data, error } = await db
+        .from('statements')
+        .select('id,payee,type,period,balance,last_payment,email_sent,contract_no,notes')
+        .order('id', { ascending: true });
+      if (error) throw error;
+      stmtEntriesCache = (data || []).map(stmtRowFromDb);
+      return stmtEntriesCache.slice();
+    }
+
+    async function stmtCreateEntry(entry) {
+      if (!db) {
+        const next = normalizeStatementEntry(Object.assign({}, entry, { id: 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) }));
+        stmtEntriesCache.push(next);
+        stmtPersistEntries(stmtEntriesCache);
+        return next;
+      }
+      const { data, error } = await db
+        .from('statements')
+        .insert(stmtDbPayload(entry))
+        .select('id,payee,type,period,balance,last_payment,email_sent,contract_no,notes')
+        .single();
+      if (error) throw error;
+      return stmtRowFromDb(data);
+    }
+
+    async function stmtUpdateEntry(entryId, entry) {
+      if (!entryId) throw new Error('Missing statement id.');
+      if (!db) {
+        stmtEntriesCache = stmtEntriesCache.map(function(item) {
+          return String(item.id) === String(entryId) ? normalizeStatementEntry(Object.assign({}, entry, { id: entryId })) : item;
+        });
+        stmtPersistEntries(stmtEntriesCache);
+        return;
+      }
+      const { error } = await db.from('statements').update(stmtDbPayload(entry)).eq('id', entryId);
+      if (error) throw error;
+    }
+
+    async function stmtDeleteEntriesByIds(ids) {
+      const rowIds = (ids || []).map(function(id) { return String(id || '').trim(); }).filter(Boolean);
+      if (!rowIds.length) return;
+      if (!db) {
+        stmtEntriesCache = stmtEntriesCache.filter(function(item) { return rowIds.indexOf(String(item.id)) === -1; });
+        stmtPersistEntries(stmtEntriesCache);
+        return;
+      }
+      const query = rowIds.length === 1
+        ? db.from('statements').delete().eq('id', rowIds[0])
+        : db.from('statements').delete().in('id', rowIds);
+      const { error } = await query;
+      if (error) throw error;
+    }
+
+    async function stmtInsertImportedEntries(entries) {
+      if (!entries || !entries.length) return 0;
+      if (!db) {
+        stmtEntriesCache = stmtEntriesCache.concat(entries.map(normalizeStatementEntry));
+        stmtPersistEntries(stmtEntriesCache);
+        return entries.length;
+      }
+      const payload = entries.map(stmtDbPayload);
+      const { data, error } = await db
+        .from('statements')
+        .insert(payload)
+        .select('id');
+      if (error) throw error;
+      return Array.isArray(data) ? data.length : payload.length;
+    }
+
     function stmtGetEntries() {
-      return stmtReadStoredEntries().map(normalizeStatementEntry);
+      return stmtEntriesCache.slice();
     }
 
     function stmtSaveEntries(arr) {
-      stmtPersistEntries((Array.isArray(arr) ? arr : []).map(normalizeStatementEntry));
+      stmtEntriesCache = (Array.isArray(arr) ? arr : []).map(normalizeStatementEntry);
+      if (!db) stmtPersistEntries(stmtEntriesCache);
     }
 
     function statementNextAmountValue(entry) {
@@ -7001,13 +7236,13 @@ Best regards`;
           if (area) area.style.display = 'none';
         });
 
-        row.querySelector('[data-del-abs]').addEventListener('click', function() {
+        row.querySelector('[data-del-abs]').addEventListener('click', async function() {
           if (!confirm('Delete statement entry for "' + (e.payee || 'this payee') + '" (' + (e.period || 'no period') + ')?')) return;
-          const arr = stmtGetEntries();
-          arr.splice(absIdx, 1);
+          if (!e.id) return;
+          await stmtDeleteEntriesByIds([e.id]);
+          await stmtFetchEntriesFromDB();
           selectedStatementIndices.Master.clear();
           selectedStatementIndices.Publishing.clear();
-          stmtSaveEntries(arr);
           stmtRebuildPeriodFilter();
           stmtRenderList();
           renderDashboard();
@@ -7295,7 +7530,7 @@ Best regards`;
       }
       const importConfirmBtn = get('stmt-import-confirm-btn');
       if (importConfirmBtn) {
-        importConfirmBtn.addEventListener('click', function() {
+        importConfirmBtn.addEventListener('click', async function() {
           if (!stmtImportPreviewRows.length) {
             if (importFeedback) { importFeedback.textContent = '⚠ Load a file first.'; importFeedback.className = 'stmt-feedback error'; }
             return;
@@ -7304,26 +7539,42 @@ Best regards`;
           const seen = new Set(existing.map(stmtImportFingerprint));
           let imported = 0;
           let skipped = 0;
+          const rowsToInsert = [];
           stmtImportPreviewRows.forEach(function(entry) {
             const key = stmtImportFingerprint(entry);
             if (seen.has(key)) {
               skipped++;
               return;
             }
-            existing.push(entry);
+            rowsToInsert.push(entry);
             seen.add(key);
             imported++;
           });
-          stmtSaveEntries(existing);
-          stmtRebuildPeriodFilter();
-          stmtRenderList();
-          renderDashboard();
-          if (importSummary) {
-            importSummary.textContent = 'Imported ' + imported + ', skipped ' + skipped + ' duplicates';
-            importSummary.className = 'stmt-feedback ok';
+          try {
+            const insertedCount = await stmtInsertImportedEntries(rowsToInsert);
+            await stmtFetchEntriesFromDB();
+            stmtRebuildPeriodFilter();
+            stmtRenderList();
+            renderDashboard();
+            if (importSummary) {
+              importSummary.textContent = 'Imported ' + insertedCount + ', skipped ' + skipped + ' duplicates';
+              importSummary.className = 'stmt-feedback ok';
+            }
+            if (importFeedback) {
+              importFeedback.textContent = '✓ Imported ' + insertedCount + ' rows to Supabase';
+              importFeedback.className = 'stmt-feedback ok';
+            }
+            setTimeout(hideImportPanel, 900);
+          } catch (err) {
+            if (importSummary) {
+              importSummary.textContent = '⚠ ' + (err.message || String(err));
+              importSummary.className = 'stmt-feedback error';
+            }
+            if (importFeedback) {
+              importFeedback.textContent = '⚠ ' + (err.message || String(err));
+              importFeedback.className = 'stmt-feedback error';
+            }
           }
-          if (importFeedback) { importFeedback.textContent = ''; importFeedback.className = 'stmt-feedback'; }
-          setTimeout(hideImportPanel, 900);
         });
       }
 
@@ -7339,7 +7590,7 @@ Best regards`;
 
       const saveBtn = get('stmt-save-btn');
       if (saveBtn) {
-        saveBtn.addEventListener('click', function() {
+        saveBtn.addEventListener('click', async function() {
           const nameEl   = get('stmt-payee-name');
           const typeEl   = get('stmt-type');
           const periodFEl= get('stmt-entry-period');
@@ -7370,30 +7621,37 @@ Best regards`;
 
           const arr     = stmtGetEntries();
           const editIdx = idxEl && idxEl.value !== '' ? parseInt(idxEl.value, 10) : -1;
-          if (editIdx >= 0 && editIdx < arr.length) {
-            arr[editIdx] = entry;
-          } else {
-            arr.push(entry);
-          }
-          stmtSaveEntries(arr);
-          stmtRebuildPeriodFilter();
-          stmtRenderList();
-          renderDashboard();
+          try {
+            if (editIdx >= 0 && editIdx < arr.length && arr[editIdx] && arr[editIdx].id) {
+              await stmtUpdateEntry(arr[editIdx].id, entry);
+            } else {
+              await stmtCreateEntry(entry);
+            }
+            await stmtFetchEntriesFromDB();
+            const refreshed = stmtGetEntries();
+            stmtRebuildPeriodFilter();
+            stmtRenderList();
+            renderDashboard();
 
-          const emailText = stmtGenerateEmail(entry, entry.period);
-          const area = get('stmt-email-area');
-          const ta   = get('stmt-email-text');
-          const hd   = get('stmt-form-heading');
-          const markSentChk = get('stmt-mark-sent-check');
-          if (area) area.style.display = '';
-          if (ta)   ta.value = emailText;
-          if (hd)   hd.textContent = 'Saved ✓ — Email for ' + name;
-          if (markSentChk) markSentChk.checked = false;
-          if (idxEl) {
-            const newIdx = editIdx >= 0 ? editIdx : arr.length - 1;
-            idxEl.value = String(newIdx);
+            const emailText = stmtGenerateEmail(entry, entry.period);
+            const area = get('stmt-email-area');
+            const ta   = get('stmt-email-text');
+            const hd   = get('stmt-form-heading');
+            const markSentChk = get('stmt-mark-sent-check');
+            if (area) area.style.display = '';
+            if (ta)   ta.value = emailText;
+            if (hd)   hd.textContent = 'Saved ✓ — Email for ' + name;
+            if (markSentChk) markSentChk.checked = false;
+            if (idxEl) {
+              const matchedIdx = refreshed.findIndex(function(item) {
+                return item.payee === entry.payee && item.period === entry.period && item.type === entry.type && Number(item.balance) === Number(entry.balance);
+              });
+              idxEl.value = String(matchedIdx >= 0 ? matchedIdx : 0);
+            }
+            if (fb) { fb.textContent = '✓ Saved'; fb.className = 'stmt-feedback ok'; }
+          } catch (err) {
+            if (fb) { fb.textContent = '⚠ ' + (err.message || String(err)); fb.className = 'stmt-feedback error'; }
           }
-          if (fb) { fb.textContent = '✓ Saved'; fb.className = 'stmt-feedback ok'; }
         });
       }
 
@@ -7415,7 +7673,7 @@ Best regards`;
 
       const markSentChk = get('stmt-mark-sent-check');
       if (markSentChk) {
-        markSentChk.addEventListener('change', function() {
+        markSentChk.addEventListener('change', async function() {
           if (!markSentChk.checked) return;
           const idxEl = get('stmt-edit-idx');
           const editIdx = idxEl && idxEl.value !== '' ? parseInt(idxEl.value, 10) : -1;
@@ -7423,7 +7681,14 @@ Best regards`;
           const arr = stmtGetEntries();
           if (!arr[editIdx]) return;
           arr[editIdx].emailSent = true;
-          stmtSaveEntries(arr);
+          try {
+            await stmtUpdateEntry(arr[editIdx].id, arr[editIdx]);
+            await stmtFetchEntriesFromDB();
+          } catch (err) {
+            const fb = get('stmt-feedback');
+            if (fb) { fb.textContent = '⚠ ' + (err.message || String(err)); fb.className = 'stmt-feedback error'; }
+            return;
+          }
           const sentEl = get('stmt-email-sent');
           if (sentEl) sentEl.checked = true;
           stmtRenderList();
@@ -7433,7 +7698,14 @@ Best regards`;
         });
       }
 
-      stmtRenderList();
+      stmtFetchEntriesFromDB().then(function() {
+        stmtRebuildPeriodFilter();
+        stmtRenderList();
+        renderDashboard();
+      }).catch(function(err) {
+        if (importFeedback) { importFeedback.textContent = '⚠ ' + (err.message || String(err)); importFeedback.className = 'stmt-feedback error'; }
+        stmtRenderList();
+      });
     }
 
     // ══════════════════════════════════════════════════════════════════════════

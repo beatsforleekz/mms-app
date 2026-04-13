@@ -1,20 +1,8 @@
 import { getSupabaseClient } from '@/lib/supabase/client';
-
-const PIPELINE_LINKS_STORAGE_KEY = 'catalogue_pipeline_links';
 const RELEASE_NOTES_STORAGE_KEY = 'release_detail_notes';
 
 function normalizeText(value) {
   return String(value == null ? '' : value).trim();
-}
-
-function readStorageArray(key) {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(key) || '[]');
-    return Array.isArray(raw) ? raw : [];
-  } catch (err) {
-    return [];
-  }
 }
 
 function readStorageObject(key) {
@@ -32,8 +20,14 @@ function writeStorageObject(key, value) {
   window.localStorage.setItem(key, JSON.stringify(value && typeof value === 'object' ? value : {}));
 }
 
-function getPipelineEntries() {
-  return readStorageArray(PIPELINE_LINKS_STORAGE_KEY).map((row) => ({
+async function getPipelineEntries() {
+  const db = getSupabaseClient();
+  const { data, error } = await db
+    .from('catalogue_pipeline_links')
+    .select('id, catalogue_id, catalogue_type, status')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map((row) => ({
     id: normalizeText(row && (row.id || row.release_id)),
     release_id: normalizeText(row && row.release_id),
     catalogue_id: normalizeText(row && row.catalogue_id),
@@ -42,12 +36,20 @@ function getPipelineEntries() {
   })).filter((row) => row.id && row.catalogue_id && row.catalogue_type);
 }
 
-function getPipelineEntry(releaseId) {
+async function getPipelineEntry(releaseId) {
   const normalizedId = normalizeText(releaseId);
-  return getPipelineEntries().find((row) => row.id === normalizedId) || null;
+  const entries = await getPipelineEntries();
+  return entries.find((row) => row.id === normalizedId) || null;
 }
 
-function resolvePipelineEntry(releaseId, catalogueId = '', catalogueType = '') {
+async function getCurrentUserId() {
+  const db = getSupabaseClient();
+  const { data, error } = await db.auth.getUser();
+  if (error) throw error;
+  return normalizeText(data?.user?.id);
+}
+
+async function resolvePipelineEntry(releaseId, catalogueId = '', catalogueType = '') {
   const normalizedCatalogueId = normalizeText(catalogueId);
   const normalizedCatalogueType = normalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
   if (normalizedCatalogueId) {
@@ -120,13 +122,13 @@ async function fetchCatalogueSource(entry) {
 }
 
 export async function fetchReleases() {
-  const entries = getPipelineEntries();
-  const rows = await Promise.all(entries.map((entry) => fetchReleaseById(entry.id)));
+  const entries = await getPipelineEntries();
+  const rows = await Promise.all(entries.map((entry) => fetchReleaseById(entry.id, entry.catalogue_id, entry.catalogue_type)));
   return rows.filter(Boolean);
 }
 
 export async function fetchReleaseById(releaseId, catalogueId = '', catalogueType = '') {
-  const entry = resolvePipelineEntry(releaseId, catalogueId, catalogueType);
+  const entry = await resolvePipelineEntry(releaseId, catalogueId, catalogueType);
   if (!entry || !entry.catalogue_id) return null;
   const source = await fetchCatalogueSource(entry);
   const savedNote = getReleaseNote(entry.id);
@@ -168,7 +170,7 @@ export async function fetchReleaseById(releaseId, catalogueId = '', catalogueTyp
 }
 
 export async function fetchAssetsByRelease(releaseId, catalogueId = '', catalogueType = '') {
-  const entry = resolvePipelineEntry(releaseId, catalogueId, catalogueType);
+  const entry = await resolvePipelineEntry(releaseId, catalogueId, catalogueType);
   const lookupKeys = getReleaseLookupKeys(releaseId, entry);
   const db = getSupabaseClient();
   let query = db
@@ -183,7 +185,7 @@ export async function fetchAssetsByRelease(releaseId, catalogueId = '', catalogu
 }
 
 export async function fetchContractsByRelease(releaseId, catalogueId = '', catalogueType = '') {
-  const entry = resolvePipelineEntry(releaseId, catalogueId, catalogueType);
+  const entry = await resolvePipelineEntry(releaseId, catalogueId, catalogueType);
   if (!entry) return [];
   const db = getSupabaseClient();
   const [{ data: linkedData, error: linkedError }, { data: legacyData, error: legacyError }, { data: joinRows, error: joinError }] = await Promise.all([
@@ -240,14 +242,19 @@ export async function fetchAllContracts() {
 }
 
 export async function fetchActionsByRelease(releaseId, catalogueId = '', catalogueType = '') {
-  const entry = resolvePipelineEntry(releaseId, catalogueId, catalogueType);
+  const entry = await resolvePipelineEntry(releaseId, catalogueId, catalogueType);
   const lookupKeys = getReleaseLookupKeys(releaseId, entry);
   const db = getSupabaseClient();
+  const currentUserId = await getCurrentUserId();
   let query = db
     .from('actions')
-    .select('id, title, related_to, reference_name, notes, due_date, priority, to_do_today, status, completed_date, release_id');
+    .select('id, title, related_to, reference_name, notes, due_date, priority, to_do_today, status, completed_date, release_id, visibility, owner_user_id');
   query = lookupKeys.length > 1 ? query.in('release_id', lookupKeys) : query.eq('release_id', lookupKeys[0] || normalizeText(releaseId));
   const { data, error } = await query;
   if (error) throw error;
-  return data || [];
+  return (data || []).filter((row) => {
+    const visibility = normalizeText(row?.visibility).toLowerCase() === 'personal' ? 'Personal' : 'Shared';
+    if (visibility !== 'Personal') return true;
+    return normalizeText(row?.owner_user_id) === currentUserId;
+  });
 }
