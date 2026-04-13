@@ -1,9 +1,4 @@
 {
-  "/dashboard/page": "app/dashboard/page.js",
-  "/settings/page": "app/settings/page.js",
-  "/releases/page": "app/releases/page.js",
-  "/payees/page": "app/payees/page.js",
   "/catalogues/page": "app/catalogues/page.js",
-  "/contracts/page": "app/contracts/page.js",
-  "/assets/page": "app/assets/page.js"
+  "/contracts/page": "app/contracts/page.js"
 }

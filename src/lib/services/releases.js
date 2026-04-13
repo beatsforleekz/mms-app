@@ -186,7 +186,7 @@ export async function fetchContractsByRelease(releaseId, catalogueId = '', catal
   const entry = resolvePipelineEntry(releaseId, catalogueId, catalogueType);
   if (!entry) return [];
   const db = getSupabaseClient();
-  const [{ data: linkedData, error: linkedError }, { data: legacyData, error: legacyError }] = await Promise.all([
+  const [{ data: linkedData, error: linkedError }, { data: legacyData, error: legacyError }, { data: joinRows, error: joinError }] = await Promise.all([
     db
       .from('contracts')
       .select('*')
@@ -197,13 +197,30 @@ export async function fetchContractsByRelease(releaseId, catalogueId = '', catal
       .from('contracts')
       .select('*')
       .eq('release_id', entry.id)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }),
+    db
+      .from('contract_catalogue_links')
+      .select('contract_id')
+      .eq('catalogue_id', entry.catalogue_id)
+      .eq('catalogue_type', entry.catalogue_type)
   ]);
   if (linkedError) throw linkedError;
   if (legacyError) throw legacyError;
+  if (joinError) throw joinError;
+  let joinContracts = [];
+  const joinIds = Array.from(new Set((joinRows || []).map((row) => normalizeText(row && row.contract_id)).filter(Boolean)));
+  if (joinIds.length) {
+    const { data: joinData, error: joinDataError } = await db
+      .from('contracts')
+      .select('*')
+      .in('id', joinIds)
+      .order('created_at', { ascending: false });
+    if (joinDataError) throw joinDataError;
+    joinContracts = joinData || [];
+  }
   const merged = [];
   const seen = new Set();
-  (linkedData || []).concat(legacyData || []).forEach((row) => {
+  (linkedData || []).concat(legacyData || []).concat(joinContracts).forEach((row) => {
     const key = normalizeText(row && row.id);
     if (!key || seen.has(key)) return;
     seen.add(key);

@@ -152,7 +152,8 @@ function CatalogueTable({
   onDeleteSelected,
   deleting,
   search,
-  onSearchChange
+  onSearchChange,
+  onExport
 }) {
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
 
@@ -162,14 +163,17 @@ function CatalogueTable({
         <h3>{type === 'publishing' ? 'Publishing Catalogue' : 'Label Catalogue'}</h3>
         <span className="count-pill">{rows.length}</span>
       </div>
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
         <input
           type="text"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={type === 'publishing' ? 'Search title or writer…' : 'Search artist or title…'}
-          style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+          style={{ flex: 1, padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
         />
+        <button type="button" className="shell-btn" onClick={onExport}>
+          Export
+        </button>
       </div>
       {selectedIds.size ? (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -312,6 +316,43 @@ export default function CatalogueTables() {
     });
     return next;
   }, [rows, activeType, search]);
+
+  function exportCsvFile(filenameBase, headers, dataRows) {
+    const escapeCell = (value) => {
+      const text = String(value == null ? '' : value);
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const csv = [headers, ...dataRows].map((row) => row.map(escapeCell).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    link.href = href;
+    link.download = `${filenameBase}-${dateStamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+  }
+
+  function handleExport() {
+    if (activeType === 'publishing') {
+      exportCsvFile('publishing-catalogue', ['Title', 'Writer', 'Tempo ID', 'ISWC'], visibleRows.map((row) => [
+        row.work_title || '',
+        row.writers || '',
+        row.tempo_id || '',
+        row.iswc || ''
+      ]));
+      return;
+    }
+    exportCsvFile('label-catalogue', ['Artist', 'Title', 'Version / Mix', 'Release / Project', 'ISRC'], visibleRows.map((row) => [
+      row.artist || '',
+      row.track_title || '',
+      row.version || '',
+      row.release_title || '',
+      row.isrc || ''
+    ]));
+  }
 
   async function loadActiveCatalogue(type = activeType) {
     setFetching(true);
@@ -555,6 +596,7 @@ export default function CatalogueTables() {
         deleting={deleting}
         search={search}
         onSearchChange={setSearch}
+        onExport={handleExport}
       />
     </section>
   );

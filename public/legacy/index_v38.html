@@ -1516,7 +1516,10 @@
         <div class="section-header">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div><h2>Release Pipeline</h2><p>Full release tracking. Completion is role-specific: Label rows show Contract / Assets / Uploads; Publisher rows show Contract / Pub Cat / Sony Reg.</p></div>
-            <button class="btn btn-primary" id="releases-new-btn">Start New Release</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-ghost" id="releases-export-btn">Export</button>
+              <button class="btn btn-primary" id="releases-new-btn">Start New Release</button>
+            </div>
           </div>
         </div>
         <hr class="divider" />
@@ -1823,6 +1826,7 @@
               <input type="hidden" id="cf-catalogue-id" />
               <input type="hidden" id="cf-catalogue-type" />
               <div id="cf-release-results" style="display:none;margin-top:6px;max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);"></div>
+              <div id="cf-linked-catalogue-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
             </div>
 
             <div class="contract-form-field">
@@ -1982,6 +1986,7 @@
         <!-- Toolbar: search + status filters -->
         <div class="contracts-toolbar">
           <input class="contracts-search" id="contracts-search" type="text" placeholder="Search contracts…" />
+          <button class="btn btn-ghost" id="contracts-export-btn" type="button">Export</button>
           <button class="filter-btn active" data-status="all">All</button>
           <button class="filter-btn" data-status="Draft">Draft</button>
           <button class="filter-btn" data-status="Pending">Pending</button>
@@ -1990,7 +1995,7 @@
         </div>
 
         <!-- Contracts debug panel -->
-        <div class="debug-panel" id="contracts-debug-panel">
+        <div class="debug-panel" id="contracts-debug-panel" style="display:none;">
           <div class="debug-title">🔍 Debug — Contracts Fetch</div>
           <div class="debug-grid">
             <span class="debug-label">Fetch status</span><span class="debug-value" id="dbg-contracts-fetch-status">—</span>
@@ -2044,7 +2049,10 @@
         <div class="section-header">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;">
             <div><h2>Actions</h2><p>Action items with due dates linked to releases. Click Edit to update, or check off when done.</p></div>
-            <button class="btn btn-primary" id="action-new-btn">+ New Action</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-ghost" id="actions-export-btn" type="button">Export</button>
+              <button class="btn btn-primary" id="action-new-btn">+ New Action</button>
+            </div>
           </div>
         </div>
         <hr class="divider" />
@@ -2208,6 +2216,7 @@
         <!-- Search -->
         <div class="payees-toolbar">
           <input class="payees-search" id="payees-search" type="text" placeholder="Search payees…" />
+          <button class="btn btn-ghost" id="payees-export-btn" type="button">Export</button>
         </div>
 
         <div id="payees-loading" class="payees-status-msg">Loading payees…</div>
@@ -2247,6 +2256,7 @@
           <div style="display:flex;justify-content:space-between;align-items:flex-start;">
             <div><h2>Statement Tracker</h2><p>Track payee balances per statement period. Each row keeps its own period — old periods stay visible.</p></div>
             <div style="display:flex;gap:8px;align-items:center;">
+              <button class="btn btn-ghost" id="stmt-export-btn">Export</button>
               <button class="btn btn-ghost" id="stmt-import-btn">Import</button>
               <button class="btn btn-primary" id="stmt-new-btn">+ New Entry</button>
             </div>
@@ -2787,6 +2797,33 @@
       return releaseId ? (currentReleaseMap[String(releaseId)] || '') : '';
     }
 
+    function csvEscape(value) {
+      return '"' + String(value == null ? '' : value).replace(/"/g, '""') + '"';
+    }
+
+    function csvDateStamp() {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    }
+
+    function downloadCsv(filenameBase, headers, rows) {
+      const csv = [headers].concat(rows || []).map(function(row) {
+        return (row || []).map(csvEscape).join(',');
+      }).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filenameBase + '-' + csvDateStamp() + '.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
     function isAddProducerType(typeValue) {
       return String(typeValue || '').trim().toLowerCase() === 'add-producer';
     }
@@ -2811,6 +2848,10 @@
     let currentReleaseId    = null;
     let currentAssets       = [];
     let currentActiveArea   = 'all';
+    let currentVisibleContracts = [];
+    let currentVisibleActions = [];
+    let currentVisiblePayees = [];
+    let currentVisibleStatements = [];
     const selectedReleaseIds = new Set();
     const selectedContractIds = new Set();
     const selectedActionIds = new Set();
@@ -3190,6 +3231,25 @@
       }).join('');
 
       return overallHtml + summaryHtml + '<div class="area-badges">' + areaHtml + '</div>';
+    }
+
+    function roleCompletionExportValue(r, assetsCache) {
+      const role = String(r && r.company_role || '').toLowerCase().trim();
+      const hasAssets = Array.isArray(assetsCache) && assetsCache.length > 0;
+      const assetsComp = hasAssets ? computeCompletion(assetsCache) : null;
+      const assetsOk = hasAssets ? assetsComp.overall : null;
+      const uploadsFromAssets = hasAssets ? uploadConfirmationReceived(assetsCache) : null;
+      const uploadsOk = uploadsFromAssets != null ? uploadsFromAssets : ((r && r.uploads_complete != null) ? r.uploads_complete : null);
+      const contractOk = signedContractExistsForRelease(r && r.id) ? true : ((r && r.contract_received != null) ? r.contract_received : null);
+      const pubCatOk = (r && r.added_to_pub_cat != null) ? r.added_to_pub_cat : null;
+      const sonyOk = (r && r.registered_with_sony != null) ? r.registered_with_sony : null;
+      function part(label, val) {
+        return label + ':' + (val === true ? '✓' : val === false ? '✗' : '?');
+      }
+      if (role.indexOf('label') >= 0 && role.indexOf('publisher') >= 0) return [part('Contract', contractOk), part('Assets', assetsOk), part('Uploads', uploadsOk), part('Pub Cat', pubCatOk), part('Sony', sonyOk)].join(' | ');
+      if (role.indexOf('label') >= 0) return [part('Contract', contractOk), part('Assets', assetsOk), part('Uploads', uploadsOk)].join(' | ');
+      if (role.indexOf('publisher') >= 0) return [part('Contract', contractOk), part('Pub Cat', pubCatOk), part('Sony', sonyOk)].join(' | ');
+      return [part('Contract', contractOk), part('Assets', assetsOk), part('Uploads', uploadsOk), part('Pub Cat', pubCatOk), part('Sony', sonyOk)].join(' | ');
     }
 
     function refreshPipelineAssetCells() {
@@ -4056,6 +4116,7 @@
     const cfRelease     = document.getElementById('cf-release');
     const cfReleaseSearch = document.getElementById('cf-release-search');
     const cfReleaseResults = document.getElementById('cf-release-results');
+    const cfLinkedCatalogueList = document.getElementById('cf-linked-catalogue-list');
     const cfCatalogueId = document.getElementById('cf-catalogue-id');
     const cfCatalogueType = document.getElementById('cf-catalogue-type');
     const cfStatus      = document.getElementById('cf-status');
@@ -4306,12 +4367,127 @@
     let allContracts = [];
     let contractsFilter = 'all';
     let contractCatalogueOptions = [];
+    let contractCatalogueLinksMap = {};
+    let currentContractCatalogueLinks = [];
 
     function contractCatalogueLabel(item) {
       if (!item) return '';
       return item.catalogue_type === 'publishing'
         ? ((item.work_title || '—') + (item.writers ? (' — ' + item.writers) : ''))
         : ((item.artist || '—') + (item.track_title ? (' — ' + item.track_title) : ''));
+    }
+
+    function contractCatalogueLinkKey(item) {
+      if (!item) return '';
+      return String(item.catalogue_type || '') + ':' + String(item.catalogue_id || '');
+    }
+
+    function resolveContractCatalogueItem(catalogueId, catalogueType) {
+      const id = String(catalogueId || '');
+      const type = String(catalogueType || '').toLowerCase() === 'publishing' ? 'publishing' : 'label';
+      const match = (contractCatalogueOptions || []).find(function(item) {
+        return String(item.catalogue_id) === id && String(item.catalogue_type) === type;
+      });
+      if (match) return match;
+      return id ? { catalogue_id: id, catalogue_type: type } : null;
+    }
+
+    function contractLinkedReleaseItems(c) {
+      const cid = String(c && c.id || '');
+      const linked = contractCatalogueLinksMap[cid];
+      if (linked && linked.length) return linked.slice();
+      if (c && c.catalogue_id && c.catalogue_type) {
+        const fallback = resolveContractCatalogueItem(c.catalogue_id, c.catalogue_type);
+        return fallback ? [fallback] : [];
+      }
+      return [];
+    }
+
+    async function fetchContractCatalogueLinksMap() {
+      if (!db) return;
+      try {
+        const { data, error } = await db
+          .from('contract_catalogue_links')
+          .select('contract_id,catalogue_id,catalogue_type')
+          .limit(5000);
+        if (error) throw error;
+        contractCatalogueLinksMap = {};
+        (data || []).forEach(function(row) {
+          const cid = String(row.contract_id || '');
+          const item = resolveContractCatalogueItem(row.catalogue_id, row.catalogue_type);
+          if (!cid || !item) return;
+          if (!contractCatalogueLinksMap[cid]) contractCatalogueLinksMap[cid] = [];
+          if (!contractCatalogueLinksMap[cid].some(function(existing) { return contractCatalogueLinkKey(existing) === contractCatalogueLinkKey(item); })) {
+            contractCatalogueLinksMap[cid].push(item);
+          }
+        });
+      } catch (err) {
+        console.warn('[Leah Ops] fetchContractCatalogueLinksMap warning:', err.message || err);
+      }
+    }
+
+    async function saveContractCatalogueLinks(contractId) {
+      const cid = String(contractId || '');
+      if (!cid || !db) return;
+      const { error: deleteError } = await db.from('contract_catalogue_links').delete().eq('contract_id', cid);
+      if (deleteError) throw deleteError;
+      const payload = (currentContractCatalogueLinks || []).map(function(item) {
+        return {
+          contract_id: cid,
+          catalogue_id: item.catalogue_id,
+          catalogue_type: item.catalogue_type
+        };
+      });
+      if (payload.length) {
+        const { error: insertError } = await db.from('contract_catalogue_links').insert(payload);
+        if (insertError) throw insertError;
+      }
+      contractCatalogueLinksMap[cid] = currentContractCatalogueLinks.slice();
+    }
+
+    function renderCurrentContractCatalogueLinks() {
+      if (!cfLinkedCatalogueList) return;
+      cfLinkedCatalogueList.innerHTML = '';
+      if (!currentContractCatalogueLinks.length) {
+        cfLinkedCatalogueList.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:2px 0;">No linked catalogue items.</div>';
+        return;
+      }
+      currentContractCatalogueLinks.forEach(function(item) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);';
+        const text = document.createElement('div');
+        text.style.cssText = 'font-size:12px;color:var(--text);min-width:0;';
+        text.textContent = contractCatalogueLabel(item);
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn btn-ghost';
+        removeBtn.style.cssText = 'font-size:11px;padding:4px 8px;color:#b91c1c;';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', async function() {
+          currentContractCatalogueLinks = currentContractCatalogueLinks.filter(function(existing) {
+            return contractCatalogueLinkKey(existing) !== contractCatalogueLinkKey(item);
+          });
+          const editingId = String(cfId && cfId.value || '');
+          if (editingId && db) {
+            const { error } = await db
+              .from('contract_catalogue_links')
+              .delete()
+              .eq('contract_id', editingId)
+              .eq('catalogue_id', item.catalogue_id)
+              .eq('catalogue_type', item.catalogue_type);
+            if (error) {
+              setContractFeedback('⚠ ' + (error.message || String(error)), 'error');
+            } else {
+              contractCatalogueLinksMap[editingId] = currentContractCatalogueLinks.slice();
+            }
+          }
+          renderCurrentContractCatalogueLinks();
+          renderContractsTable();
+        });
+        row.appendChild(text);
+        row.appendChild(removeBtn);
+        cfLinkedCatalogueList.appendChild(row);
+      });
     }
 
     async function fetchContractCatalogueOptions() {
@@ -4340,13 +4516,26 @@
 
     function setContractCatalogueSelection(item) {
       if (!item) { clearContractCatalogueSelection(); return; }
-      if (cfCatalogueId) cfCatalogueId.value = item.catalogue_id || '';
-      if (cfCatalogueType) cfCatalogueType.value = item.catalogue_type || '';
-      if (cfRelease) cfRelease.value = item.catalogue_id || '';
-      if (cfReleaseSearch) cfReleaseSearch.value = contractCatalogueLabel(item);
-      if (cfReleaseResults) {
-        cfReleaseResults.innerHTML = '';
-        cfReleaseResults.style.display = 'none';
+      const key = contractCatalogueLinkKey(item);
+      if (!currentContractCatalogueLinks.some(function(existing) { return contractCatalogueLinkKey(existing) === key; })) {
+        currentContractCatalogueLinks.push(item);
+      }
+      clearContractCatalogueSelection();
+      renderCurrentContractCatalogueLinks();
+      const editingId = String(cfId && cfId.value || '');
+      if (editingId && db) {
+        db.from('contract_catalogue_links').insert({
+          contract_id: editingId,
+          catalogue_id: item.catalogue_id,
+          catalogue_type: item.catalogue_type
+        }).then(function(result) {
+          if (result && result.error) {
+            setContractFeedback('⚠ ' + (result.error.message || String(result.error)), 'error');
+            return;
+          }
+          contractCatalogueLinksMap[editingId] = currentContractCatalogueLinks.slice();
+          renderContractsTable();
+        });
       }
     }
 
@@ -4398,6 +4587,7 @@
       cfId.value = '';
       cfTitle.value = '';
       clearContractCatalogueSelection();
+      currentContractCatalogueLinks = [];
       cfStatus.value = 'Draft';
       setDateInputValue(cfDateSent, '');
       setDateInputValue(cfDateRecv, '');
@@ -4412,6 +4602,7 @@
       contractPayees = [];
       renderContractPayeesList();
       renderPayeesTable();
+      renderCurrentContractCatalogueLinks();
       elPayeeAddName.value = ''; elPayeeAddEmail.value = ''; elPayeeAddSplit.value = '';
       setContractFeedback('', '');
       document.getElementById('contract-form-heading').textContent = 'New Contract';
@@ -4433,24 +4624,9 @@
     function editContract(c) {
       cfId.value         = String(c.id);
       cfTitle.value      = c.title || '';
-      if (c.catalogue_id && c.catalogue_type) {
-        setContractCatalogueSelection({
-          catalogue_id: String(c.catalogue_id),
-          catalogue_type: String(c.catalogue_type),
-          artist: c.artist || '',
-          track_title: c.title || '',
-          work_title: c.title || '',
-          writers: c.artist || ''
-        });
-        const match = (contractCatalogueOptions || []).find(function(item) {
-          return String(item.catalogue_id) === String(c.catalogue_id) && String(item.catalogue_type) === String(c.catalogue_type);
-        });
-        if (match) setContractCatalogueSelection(match);
-      } else {
-        clearContractCatalogueSelection();
-        if (cfRelease) cfRelease.value = c.release_id ? String(c.release_id) : '';
-        if (cfReleaseSearch) cfReleaseSearch.value = c.release_id ? (releaseTitleForId(c.release_id) || String(c.release_id)) : '';
-      }
+      clearContractCatalogueSelection();
+      currentContractCatalogueLinks = contractLinkedReleaseItems(c);
+      renderCurrentContractCatalogueLinks();
       cfStatus.value     = c.status || 'Draft';
       setDateInputValue(cfDateSent, c.date_sent);
       setDateInputValue(cfDateRecv, c.date_received);
@@ -4514,6 +4690,7 @@
           return;
         }
         await fetchContractCatalogueOptions();
+        await fetchContractCatalogueLinksMap();
         allContracts = (data || []).map(function(c) {
           return Object.assign({}, c, {
             participates_in_royalties: contractParticipatesInRoyalties(c)
@@ -4630,13 +4807,8 @@
     }
 
     function contractLinkedReleaseLabel(c) {
-      if (c && c.catalogue_id && c.catalogue_type) {
-        const match = (contractCatalogueOptions || []).find(function(item) {
-          return String(item.catalogue_id) === String(c.catalogue_id) && String(item.catalogue_type) === String(c.catalogue_type);
-        });
-        if (match) return contractCatalogueLabel(match);
-        return (String(c.catalogue_type) === 'publishing' ? 'Publishing' : 'Label') + ' catalogue item';
-      }
+      const items = contractLinkedReleaseItems(c);
+      if (items.length) return items.map(contractCatalogueLabel).join('; ');
       return c && c.release_id ? (releaseTitleForId(c.release_id) || String(c.release_id)) : '';
     }
 
@@ -4659,6 +4831,7 @@
         }
         return true;
       });
+      currentVisibleContracts = rows.slice();
 
       if (rows.length === 0) {
         syncSelectAllCheckbox([], selectedContractIds, 'contracts-select-all');
@@ -4758,9 +4931,9 @@
       const payload = {
         title:               title,
         contract_type:       typeCombo.getValue() || null,
-        release_id:          cfCatalogueId && cfCatalogueId.value ? null : (cfRelease.value || null),
-        catalogue_id:        cfCatalogueId ? (cfCatalogueId.value || null) : null,
-        catalogue_type:      cfCatalogueType ? (cfCatalogueType.value || null) : null,
+        release_id:          null,
+        catalogue_id:        null,
+        catalogue_type:      null,
         status:              cfStatus.value || 'Draft',
         sending_party:       senderCombo.getValue() || null,
         parties:             partiesStr,
@@ -4787,11 +4960,13 @@
         }
         // Save contract_payees rows
         if (savedContractId) await saveContractPayeesToDB(savedContractId);
+        if (savedContractId) await saveContractCatalogueLinks(savedContractId);
         setContractFeedback('✓ Saved', 'ok');
         await fetchPayees();
         await fetchContractPayeesMap();
+        await fetchContractCatalogueLinksMap();
         await fetchContracts();
-        setTimeout(()=>{ hideContractForm(); }, 1000);
+        hideContractForm();
       } catch(err) {
         console.error('[Leah Ops] save contract error:', err.message);
         // Friendly message for the unique constraint on release_id (now removed by migration,
@@ -5342,6 +5517,7 @@
     function renderActionList() {
       if (!elActionList) return;
       elActionList.innerHTML = '';
+      currentVisibleActions = [];
 
       if (allActions.length === 0) {
         syncSelectAllCheckbox([], selectedActionIds, 'actions-select-all');
@@ -5369,6 +5545,7 @@
           return groupDef.key === 'Chase' ? st === 'Chase' : st.toLowerCase() === groupDef.key.toLowerCase();
         }).slice().sort(compareActionsForList);
         if (!items.length) return;
+        currentVisibleActions = currentVisibleActions.concat(items);
 
         const groupEl = document.createElement('div');
         groupEl.className = 'action-group';
@@ -6095,6 +6272,7 @@
         if (!searchTerm) return true;
         return [(p.name||''),(p.email||''),(p.address||''),(p.notes||'')].join(' ').toLowerCase().includes(searchTerm);
       });
+      currentVisiblePayees = rows.slice();
 
       const loadEl  = document.getElementById('payees-loading');
       const errEl   = document.getElementById('payees-error');
@@ -6735,6 +6913,7 @@ Best regards`;
       const allEntries = stmtGetEntries().map(normalizeStatementEntry);
       const filterVal  = (document.getElementById('stmt-period-filter') || {}).value || stmtGetFilter() || '';
       const entries    = filterVal ? allEntries.filter(function(e) { return e.period === filterVal; }) : allEntries;
+      currentVisibleStatements = entries.slice();
 
       const masterEntries     = entries.filter(function(e) { return (e.type || 'Master') === 'Master'; });
       const publishingEntries = entries.filter(function(e) { return e.type === 'Publishing'; });
@@ -6879,6 +7058,98 @@ Best regards`;
       if (elSent)   elSent.checked = !!normalized.emailSent;
       if (elNotes)  elNotes.value  = normalized.notes || '';
       if (fb) { fb.textContent = ''; fb.className = 'stmt-feedback'; }
+    }
+
+    function exportReleasePipelineCsv() {
+      downloadCsv('release-pipeline', [
+        'ID','Title','Artist','Type','Company Role','Status','Completion','Assets Complete','Release / Deadline','Owner','Notes'
+      ], (currentReleasesData || []).map(function(r) {
+        const cachedAssets = getCachedAssetsForRelease(r);
+        return [
+          r.internal_id || r.id || '',
+          r.title || '',
+          r.artist || '',
+          r.type || '',
+          r.company_role || '',
+          r.status || '',
+          roleCompletionExportValue(r, cachedAssets),
+          String(assetsCompleteCell(r.id)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+          formatDateDisplay(r.release_date),
+          r.owner || '',
+          r.notes || ''
+        ];
+      }));
+    }
+
+    function exportContractsCsv() {
+      downloadCsv('contracts', [
+        'Contract Title','Type','Release','Status','Sending Party','Parties / Payees','Artist Share','Date Sent','Received','Eddy','Dropbox','Notes'
+      ], (currentVisibleContracts || []).map(function(c) {
+        const participates = contractParticipatesInRoyalties(c);
+        return [
+          c.title || '',
+          c.contract_type || '',
+          contractLinkedReleaseLabel(c) || '',
+          c.status || '',
+          c.sending_party || '',
+          contractNeedsRoyaltyShares(c) ? payeesSummary(c) : '',
+          participates && c.artist_share_percent != null ? (c.artist_share_percent + '%') : '',
+          fmtDate(c.date_sent),
+          fmtDate(c.date_received),
+          c.added_to_eddy ? 'Yes' : '',
+          c.dropbox_url || '',
+          c.notes || ''
+        ];
+      }));
+    }
+
+    function exportActionsCsv() {
+      downloadCsv('actions', [
+        'Title','Related To','Reference Name','Linked Release','Priority','Status','Due Date','Completed Date','Today','Notes'
+      ], (currentVisibleActions || []).map(function(a) {
+        return [
+          a.title || '',
+          a.related_to || '',
+          a.reference_name || '',
+          releaseTitleForId(a.release_id) || '',
+          a.priority || '',
+          a.status || '',
+          a.due_date || '',
+          a.completed_date || '',
+          actionTodayBool(a.to_do_today) ? 'Yes' : '',
+          a.notes || ''
+        ];
+      }));
+    }
+
+    function exportPayeesCsv() {
+      downloadCsv('payees', [
+        'Name','Email','Address','Notes'
+      ], (currentVisiblePayees || []).map(function(p) {
+        return [
+          p.name || '',
+          p.email || '',
+          p.address || '',
+          p.notes || ''
+        ];
+      }));
+    }
+
+    function exportStatementsCsv() {
+      downloadCsv('statements', [
+        'Payee Name','Period','Type','Balance','Next Statement Amount','Last Payment','Email Sent','Notes'
+      ], (currentVisibleStatements || []).map(function(e) {
+        return [
+          e.payee || '',
+          e.period || '',
+          e.type || '',
+          parseFloat(e.balance || 0).toFixed(2),
+          statementNextAmountValue(e).toFixed(2),
+          e.lastPayment ? parseFloat(e.lastPayment || 0).toFixed(2) : '',
+          e.emailSent ? 'Yes' : 'No',
+          e.notes || ''
+        ];
+      }));
     }
 
     function stmtResetForm() {
@@ -7589,6 +7860,16 @@ Best regards`;
     // Statement tracker init on load
     stmtInit();
     stmtRebuildPeriodFilter();
+    const releasesExportBtn = document.getElementById('releases-export-btn');
+    if (releasesExportBtn) releasesExportBtn.addEventListener('click', exportReleasePipelineCsv);
+    const contractsExportBtn = document.getElementById('contracts-export-btn');
+    if (contractsExportBtn) contractsExportBtn.addEventListener('click', exportContractsCsv);
+    const actionsExportBtn = document.getElementById('actions-export-btn');
+    if (actionsExportBtn) actionsExportBtn.addEventListener('click', exportActionsCsv);
+    const payeesExportBtn = document.getElementById('payees-export-btn');
+    if (payeesExportBtn) payeesExportBtn.addEventListener('click', exportPayeesCsv);
+    const stmtExportBtn = document.getElementById('stmt-export-btn');
+    if (stmtExportBtn) stmtExportBtn.addEventListener('click', exportStatementsCsv);
     [
       cfDateSent,
       cfDateRecv,
