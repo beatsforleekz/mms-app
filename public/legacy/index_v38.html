@@ -818,7 +818,7 @@
 
     .action-row {
       display: grid;
-      grid-template-columns: 24px 1fr 120px 90px 80px 40px;
+      grid-template-columns: 24px minmax(0,1fr) 90px 90px 92px 150px;
       align-items: center;
       gap: 0;
       padding: 0;
@@ -842,8 +842,13 @@
       width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent);
     }
 
-    .action-title { padding: 10px 12px; font-size: 13px; }
-    .action-title-text { font-weight: 500; }
+    .action-title { padding: 10px 12px; font-size: 13px; min-width: 0; }
+    .action-title-text { font-weight: 500; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .action-title-meta { display:block; font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .action-inline-flag { font-size:10px; font-weight:700; margin-left:6px; white-space:nowrap; }
+    .action-inline-flag.today { color: var(--accent); }
+    .action-inline-flag.shared { color: #c2410c; }
+    .action-inline-flag.personal { color: #7c3aed; }
 
     .action-release {
       padding: 10px 8px; font-size: 11px; color: var(--muted);
@@ -867,6 +872,23 @@
     .action-del {
       display: flex; align-items: center; justify-content: center;
       padding: 0 12px 0 4px;
+    }
+
+    .action-done-btn {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .action-done-btn.ready {
+      color: #047857;
+      border-color: #a7f3d0;
+      background: #ecfdf5;
     }
 
     .action-del-btn {
@@ -2146,6 +2168,17 @@
           <input type="text" id="action-title-input" placeholder="Quick add: action title…" />
           <select id="action-release-select">
             <option value="">— release (optional) —</option>
+          </select>
+          <select id="action-visibility-input" title="Task type">
+            <option value="Shared">Shared</option>
+            <option value="Personal">Personal</option>
+          </select>
+          <select id="action-status-input" title="Status">
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="Chase">Chase</option>
+            <option value="blocked">Blocked</option>
+            <option value="done">Done</option>
           </select>
           <input type="date" id="action-due-input" title="Due date (optional)" />
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);white-space:nowrap;"><input type="checkbox" id="action-today-input" style="accent-color:var(--accent);" /> Today</label>
@@ -5283,6 +5316,8 @@
     // Quick-add bar elements (kept from v29 for fast entry)
     const elActionTitle   = document.getElementById('action-title-input');
     const elActionRelease = document.getElementById('action-release-select');
+    const elActionVisibilityQuick = document.getElementById('action-visibility-input');
+    const elActionStatusQuick = document.getElementById('action-status-input');
     const elActionDue     = document.getElementById('action-due-input');
     const elActionTodayQuick = document.getElementById('action-today-input');
     const elActionAddBtn  = document.getElementById('action-add-btn');
@@ -5650,25 +5685,16 @@
           });
           selectWrap.appendChild(selectChk);
 
-          const checkWrap = document.createElement('div');
-          checkWrap.className = 'action-check';
-          const chk = document.createElement('input');
-          chk.type = 'checkbox';
-          chk.checked = isDone;
-          chk.title = isDone ? 'Mark as open' : 'Mark as done';
-          chk.addEventListener('change', async function() { await toggleActionDone(a, chk.checked); });
-          checkWrap.appendChild(chk);
-
           const titleWrap = document.createElement('div');
           titleWrap.className = 'action-title';
           const relatedStr = [a.related_to, a.reference_name, releaseTitle].filter(Boolean).join(' · ');
           const visibilityTag = actionVisibilityValue(a.visibility) === 'Personal'
-            ? '<span style="font-size:10px;font-weight:700;color:#7c3aed;margin-left:6px;">PERSONAL</span>'
-            : '<span style="font-size:10px;font-weight:700;color:var(--muted);margin-left:6px;">SHARED</span>';
+            ? '<span class="action-inline-flag personal">PERSONAL</span>'
+            : '<span class="action-inline-flag shared">SHARED</span>';
           titleWrap.innerHTML =
             '<span class="action-title-text">' + escapeHtml(a.title||'—') + '</span>' +
-            (relatedStr ? '<br><span style="font-size:11px;color:var(--muted);">' + escapeHtml(relatedStr) + '</span>' : '') +
-            (actionTodayBool(a.to_do_today) ? '<span style="font-size:10px;font-weight:700;color:var(--accent);margin-left:6px;">TODAY</span>' : '') +
+            (relatedStr ? '<span class="action-title-meta">' + escapeHtml(relatedStr) + '</span>' : '') +
+            (actionTodayBool(a.to_do_today) ? '<span class="action-inline-flag today">TODAY</span>' : '') +
             visibilityTag;
 
           const priWrap = document.createElement('div');
@@ -5692,20 +5718,30 @@
           const actionsWrap = document.createElement('div');
           actionsWrap.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;padding:0 10px;gap:4px;';
 
+          const doneBtn = document.createElement('button');
+          doneBtn.className = 'action-done-btn' + (isDone ? '' : ' ready');
+          doneBtn.textContent = isDone ? 'Reopen' : 'Done';
+          doneBtn.title = isDone ? 'Mark as open' : 'Mark as done';
+          doneBtn.addEventListener('click', async function(e) {
+            e.stopPropagation();
+            await toggleActionDone(a, !isDone);
+          });
+
           const editBtn = document.createElement('button');
           editBtn.className = 'action-edit-row-btn';
           editBtn.textContent = 'Edit';
-          editBtn.addEventListener('click', function() { openActionEditPanel(a); });
+          editBtn.addEventListener('click', function(e) { e.stopPropagation(); openActionEditPanel(a); });
 
           const delBtn = document.createElement('button');
           delBtn.className = 'action-del-btn'; delBtn.textContent = '✕'; delBtn.title = 'Delete';
-          delBtn.addEventListener('click', async function() {
+          delBtn.addEventListener('click', async function(e) {
+            e.stopPropagation();
             if (!confirm('Delete "' + (a.title||'this action') + '"?')) return;
             await deleteAction(a.id);
           });
 
-          actionsWrap.append(editBtn, delBtn);
-          row.append(selectWrap, checkWrap, titleWrap, priWrap, dueWrap, statusWrap, actionsWrap);
+          actionsWrap.append(doneBtn, editBtn, delBtn);
+          row.append(selectWrap, titleWrap, priWrap, dueWrap, statusWrap, actionsWrap);
           groupEl.appendChild(row);
         });
 
@@ -6069,16 +6105,21 @@
           release_id: elActionRelease ? (elActionRelease.value || null) : null,
           due_date:   quickDueDateCheck.value || null,
           to_do_today: elActionTodayQuick ? elActionTodayQuick.checked : false,
-          visibility: 'Shared',
-          owner_user_id: null,
-          status:     'open',
+          visibility: actionVisibilityValue(elActionVisibilityQuick ? elActionVisibilityQuick.value : 'Shared'),
+          owner_user_id: actionVisibilityValue(elActionVisibilityQuick ? elActionVisibilityQuick.value : 'Shared') === 'Personal' ? (currentLegacyUserId || null) : null,
+          status:     (elActionStatusQuick ? elActionStatusQuick.value : 'open') || 'open',
         };
+
+        if (payload.visibility === 'Personal' && !currentLegacyUserId) await fetchLegacyCurrentUser();
+        if (payload.visibility === 'Personal') payload.owner_user_id = currentLegacyUserId || null;
 
         try {
           const { error } = await db.from('actions').insert(payload);
           if (error) throw error;
           if (elActionTitle)   elActionTitle.value   = '';
           if (elActionRelease) elActionRelease.value = '';
+          if (elActionVisibilityQuick) elActionVisibilityQuick.value = 'Shared';
+          if (elActionStatusQuick) elActionStatusQuick.value = 'open';
           if (elActionDue)     elActionDue.value     = '';
           if (elActionTodayQuick) elActionTodayQuick.checked = false;
           await fetchActions();

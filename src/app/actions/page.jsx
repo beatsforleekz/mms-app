@@ -1,5 +1,5 @@
-import LegacySectionFrame from '@/components/legacy/LegacySectionFrame';
+import ActionsWorkspace from '@/components/actions/ActionsWorkspace';
 
 export default function ActionsPage() {
-  return <LegacySectionFrame section="actions" />;
+  return <ActionsWorkspace />;
 }
