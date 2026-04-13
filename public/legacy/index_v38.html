@@ -2618,6 +2618,11 @@
       const t = document.getElementById('section-' + id); if (t) t.classList.add('active');
       const b = document.querySelector('.nav-btn[data-section="' + id + '"]'); if (b) b.classList.add('active');
       topbarTitle.textContent = TITLES[id] || '';
+      if (id === 'assets' && typeof refreshAssetsReleaseDropdownFromPipeline === 'function') {
+        refreshAssetsReleaseDropdownFromPipeline().catch(function(err) {
+          console.warn('[Assets Checklist] Failed to refresh release dropdown:', err && err.message ? err.message : err);
+        });
+      }
       if (!EMBED_MODE) {
         const nextUrl = new URL(window.location.href);
         nextUrl.searchParams.delete('section');
@@ -3666,6 +3671,14 @@
       }
     }
 
+    async function refreshAssetsReleaseDropdownFromPipeline() {
+      const rows = await fetchReleases();
+      currentReleasesData = rows || [];
+      refreshReleaseMap(currentReleasesData);
+      populateAssetsReleaseDropdown(currentReleasesData);
+      return currentReleasesData;
+    }
+
     async function fetchAssetsForRelease(releaseLike) {
       dbgA.fetchStatus('Fetching…','debug-warn'); dbgA.rowCount('—'); dbgA.fetchError('');
       elAssetsLoadStatus.textContent = 'Loading…';
@@ -4104,6 +4117,11 @@
     }
 
     // Release selector
+    elAssetsReleaseSelect.addEventListener('focus', function() {
+      refreshAssetsReleaseDropdownFromPipeline().catch(function(err) {
+        console.warn('[Assets Checklist] Release dropdown refresh failed:', err && err.message ? err.message : err);
+      });
+    });
     elAssetsReleaseSelect.addEventListener('change', function() {
       const rid = elAssetsReleaseSelect.value;
       if (!rid) {
