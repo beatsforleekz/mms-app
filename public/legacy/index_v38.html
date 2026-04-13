@@ -3000,19 +3000,21 @@
     async function createPipelineReferenceEntry(catalogueType, catalogueId, status) {
       const type = catalogueNormalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
       const id = catalogueNormalizeText(catalogueId);
+      if (!id) throw new Error('Missing catalogue id');
       const source = resolveCatalogueRow(type, id);
       if (!source) {
         console.warn('[Catalogue → Pipeline] Blocked reference entry because catalogue data is missing.', { catalogue_type: type, catalogue_id: id });
         throw new Error('Missing catalogue data');
       }
-      const entryId = 'catalogue:' + type + ':' + id;
-      const nextEntry = {
-        id: entryId,
-        catalogue_id: id,
-        catalogue_type: type,
-        status: catalogueNormalizeText(status) || 'New'
-      };
+      const nextStatus = catalogueNormalizeText(status) || 'New';
       if (!db) {
+        const entryId = 'catalogue:' + type + ':' + id;
+        const nextEntry = {
+          id: entryId,
+          catalogue_id: id,
+          catalogue_type: type,
+          status: nextStatus
+        };
         const entries = normalizePipelineReferenceEntries(lsReadArray(PIPELINE_REFERENCE_STORAGE_KEY));
         if (!entries.some(function(entry) { return entry.id === entryId; })) {
           entries.push(nextEntry);
@@ -3021,12 +3023,35 @@
         pipelineReferenceEntriesCache = entries;
         return entryId;
       }
-      const { error } = await db
+      const { data: existing, error: existingError } = await db
         .from('catalogue_pipeline_links')
-        .upsert(nextEntry, { onConflict: 'id' });
-      if (error) throw error;
+        .select('id,catalogue_id,catalogue_type,status')
+        .eq('catalogue_id', id)
+        .eq('catalogue_type', type)
+        .maybeSingle();
+      if (existingError) {
+        console.error('[Catalogue → Pipeline] Existing entry check failed:', existingError);
+        throw existingError;
+      }
+      if (existing) {
+        await fetchPipelineReferenceEntries();
+        return String(existing.id || '');
+      }
+      const { data: inserted, error } = await db
+        .from('catalogue_pipeline_links')
+        .insert({
+          catalogue_id: id,
+          catalogue_type: type,
+          status: nextStatus
+        })
+        .select('id,catalogue_id,catalogue_type,status')
+        .single();
+      if (error) {
+        console.error('[Catalogue → Pipeline] Insert failed:', error);
+        throw error;
+      }
       await fetchPipelineReferenceEntries();
-      return entryId;
+      return String(inserted && inserted.id || '');
     }
 
     async function deletePipelineReferenceEntries(ids) {

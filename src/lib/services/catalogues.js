@@ -389,6 +389,7 @@ export function getCatalogueRow(catalogueType, catalogueId) {
 export async function createCataloguePipelineEntry(catalogueType, catalogueId, status = 'New', sourceRow = null) {
   const normalizedType = normalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
   const normalizedId = normalizeText(catalogueId);
+  if (!normalizedId) throw new Error('Missing catalogue id.');
   const resolvedSource = sourceRow || getCatalogueRow(normalizedType, normalizedId);
   if (!resolvedSource) {
     console.warn('[Catalogue → Pipeline] Blocked reference entry because catalogue data is missing.', {
@@ -397,17 +398,46 @@ export async function createCataloguePipelineEntry(catalogueType, catalogueId, s
     });
     throw new Error('Missing catalogue data');
   }
-  const entry = {
-    id: `catalogue:${normalizedType}:${normalizedId}`,
+  const db = getSupabaseClient();
+  const nextStatus = normalizeText(status) || 'New';
+  const { data: existing, error: existingError } = await db
+    .from('catalogue_pipeline_links')
+    .select('id, catalogue_id, catalogue_type, status')
+    .eq('catalogue_id', normalizedId)
+    .eq('catalogue_type', normalizedType)
+    .maybeSingle();
+  if (existingError) {
+    console.error('[Catalogue → Pipeline] Failed to check existing entry:', existingError);
+    throw existingError;
+  }
+  if (existing) {
+    await fetchCataloguePipelineLinks();
+    return {
+      id: normalizeText(existing.id),
+      catalogue_id: normalizeText(existing.catalogue_id),
+      catalogue_type: normalizeText(existing.catalogue_type),
+      status: normalizeText(existing.status) || 'New'
+    };
+  }
+  const payload = {
     catalogue_id: normalizedId,
     catalogue_type: normalizedType,
-    status: normalizeText(status) || 'New'
+    status: nextStatus
   };
-  const db = getSupabaseClient();
-  const { error } = await db
+  const { data: inserted, error } = await db
     .from('catalogue_pipeline_links')
-    .upsert(entry, { onConflict: 'id' });
-  if (error) throw error;
+    .insert(payload)
+    .select('id, catalogue_id, catalogue_type, status')
+    .single();
+  if (error) {
+    console.error('[Catalogue → Pipeline] Insert failed:', error);
+    throw error;
+  }
   await fetchCataloguePipelineLinks();
-  return entry;
+  return {
+    id: normalizeText(inserted && inserted.id),
+    catalogue_id: normalizeText(inserted && inserted.catalogue_id),
+    catalogue_type: normalizeText(inserted && inserted.catalogue_type),
+    status: normalizeText(inserted && inserted.status) || 'New'
+  };
 }
