@@ -18,6 +18,8 @@ import {
   updatePublishingCatalogueRow
 } from '@/lib/services/catalogues';
 
+const PAGE_SIZE = 100;
+
 function CatalogueActions({ importType, onTypeChange, onImport, onAddNew, disabled }) {
   return (
     <>
@@ -142,6 +144,11 @@ function ImportPreview({
 function CatalogueTable({
   type,
   rows,
+  totalRows,
+  rangeStart,
+  rangeEnd,
+  page,
+  totalPages,
   linkedIds,
   busyId,
   selectedIds,
@@ -156,6 +163,8 @@ function CatalogueTable({
   onSearchChange,
   sortOrder,
   onSortChange,
+  onPrevPage,
+  onNextPage,
   onExport
 }) {
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
@@ -164,7 +173,7 @@ function CatalogueTable({
     <div className="module-card">
       <div className="module-card-head">
         <h3>{type === 'publishing' ? 'Publishing Catalogue' : 'Label Catalogue'}</h3>
-        <span className="count-pill">{rows.length}</span>
+        <span className="count-pill">{totalRows}</span>
       </div>
       <div style={{ marginBottom: 12, display: 'flex', gap: 10, alignItems: 'center' }}>
         <input
@@ -192,96 +201,105 @@ function CatalogueTable({
         </div>
       ) : null}
       {rows.length ? (
-        <div className="table-wrap">
-          <table className="catalogue-table">
-            <thead>
-              <tr>
-                <th>
-                  <input type="checkbox" checked={allSelected} onChange={(event) => onToggleAll(event.target.checked)} aria-label="Select all visible rows" />
-                </th>
-                {type === 'publishing' ? (
-                  <>
-                    <th>Title</th>
-                    <th>Writer</th>
-                    <th>Tempo ID</th>
-                    <th>ISWC</th>
-                  </>
-                ) : (
-                  <>
-                    <th>Artist</th>
-                    <th>Title</th>
-                    <th>Version / Mix</th>
-                    <th>Release / Project</th>
-                    <th>ISRC</th>
-                  </>
-                )}
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const isLinked = linkedIds.has(row.id);
-                const isBusy = busyId === row.id;
-                return (
-                  <tr key={row.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(row.id)}
-                        onChange={(event) => onToggleRow(row.id, event.target.checked)}
-                        aria-label="Select row"
-                      />
-                    </td>
-                    {type === 'publishing' ? (
-                      <>
-                        <td title={row.work_title || ''}><strong>{row.work_title || '—'}</strong></td>
-                        <td title={row.writers || ''}>{row.writers || '—'}</td>
-                        <td title={row.tempo_id || ''}>{row.tempo_id || '—'}</td>
-                        <td title={row.iswc || ''}>{row.iswc || '—'}</td>
-                      </>
-                    ) : (
-                      <>
-                        <td title={row.artist || ''}><strong>{row.artist || '—'}</strong></td>
-                        <td title={row.track_title || ''}>{row.track_title || '—'}</td>
-                        <td title={row.version || ''}>{row.version || '—'}</td>
-                        <td title={row.release_title || ''}>{row.release_title || '—'}</td>
-                        <td title={row.isrc || ''}>{row.isrc || '—'}</td>
-                      </>
-                    )}
-                    <td>
-                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          className="shell-btn"
-                          onClick={() => onAdd(row)}
-                          disabled={isLinked || isBusy}
-                        >
-                          {isBusy ? 'Adding…' : isLinked ? 'Added' : 'Add to Pipeline'}
-                        </button>
-                        <button
-                          type="button"
-                          className="shell-btn"
-                          onClick={() => onEditRow(row)}
-                          disabled={deleting || isBusy}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="shell-btn"
-                          onClick={() => onDeleteRow(row.id)}
-                          disabled={deleting}
-                        >
-                          {deleting ? 'Deleting…' : 'Delete'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="table-wrap">
+            <table className="catalogue-table">
+              <thead>
+                <tr>
+                  <th>
+                    <input type="checkbox" checked={allSelected} onChange={(event) => onToggleAll(event.target.checked)} aria-label="Select all visible rows" />
+                  </th>
+                  {type === 'publishing' ? (
+                    <>
+                      <th>Title</th>
+                      <th>Writer</th>
+                      <th>Tempo ID</th>
+                      <th>ISWC</th>
+                    </>
+                  ) : (
+                    <>
+                      <th>Artist</th>
+                      <th>Title</th>
+                      <th>Version / Mix</th>
+                      <th>Release / Project</th>
+                      <th>ISRC</th>
+                    </>
+                  )}
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const isLinked = linkedIds.has(row.id);
+                  const isBusy = busyId === row.id;
+                  return (
+                    <tr key={row.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={(event) => onToggleRow(row.id, event.target.checked)}
+                          aria-label="Select row"
+                        />
+                      </td>
+                      {type === 'publishing' ? (
+                        <>
+                          <td title={row.work_title || ''}><strong>{row.work_title || '—'}</strong></td>
+                          <td title={row.writers || ''}>{row.writers || '—'}</td>
+                          <td title={row.tempo_id || ''}>{row.tempo_id || '—'}</td>
+                          <td title={row.iswc || ''}>{row.iswc || '—'}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td title={row.artist || ''}><strong>{row.artist || '—'}</strong></td>
+                          <td title={row.track_title || ''}>{row.track_title || '—'}</td>
+                          <td title={row.version || ''}>{row.version || '—'}</td>
+                          <td title={row.release_title || ''}>{row.release_title || '—'}</td>
+                          <td title={row.isrc || ''}>{row.isrc || '—'}</td>
+                        </>
+                      )}
+                      <td>
+                        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="shell-btn"
+                            onClick={() => onAdd(row)}
+                            disabled={isLinked || isBusy}
+                          >
+                            {isBusy ? 'Adding…' : isLinked ? 'Added' : 'Add to Pipeline'}
+                          </button>
+                          <button
+                            type="button"
+                            className="shell-btn"
+                            onClick={() => onEditRow(row)}
+                            disabled={deleting || isBusy}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="shell-btn"
+                            onClick={() => onDeleteRow(row.id)}
+                            disabled={deleting}
+                          >
+                            {deleting ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="list-pagination">
+            <span className="list-pagination-range">{rangeStart}-{rangeEnd} of {totalRows}</span>
+            <div className="list-pagination-actions">
+              <button type="button" className="shell-btn" onClick={onPrevPage} disabled={page <= 1}>Previous</button>
+              <button type="button" className="shell-btn" onClick={onNextPage} disabled={page >= totalPages}>Next</button>
+            </div>
+          </div>
+        </>
       ) : (
         <div className="empty-block">{type === 'publishing' ? 'No publishing catalogue rows imported yet.' : 'No label catalogue rows imported yet.'}</div>
       )}
@@ -309,8 +327,9 @@ export default function CatalogueTables() {
   const [savingManual, setSavingManual] = useState(false);
   const [manualValues, setManualValues] = useState({});
   const [editingRowId, setEditingRowId] = useState('');
+  const [page, setPage] = useState(1);
 
-  const visibleRows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     const lowered = search.trim().toLowerCase();
     const next = rows.filter((row) => {
       if (!lowered) return true;
@@ -330,6 +349,24 @@ export default function CatalogueTables() {
     });
     return next;
   }, [rows, activeType, search, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeType, search, sortOrder]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, page]);
+
+  const rangeStart = filteredRows.length ? ((page - 1) * PAGE_SIZE) + 1 : 0;
+  const rangeEnd = filteredRows.length ? Math.min(page * PAGE_SIZE, filteredRows.length) : 0;
 
   function exportCsvFile(filenameBase, headers, dataRows) {
     const escapeCell = (value) => {
@@ -351,7 +388,7 @@ export default function CatalogueTables() {
 
   function handleExport() {
     if (activeType === 'publishing') {
-      exportCsvFile('publishing-catalogue', ['Title', 'Writer', 'Tempo ID', 'ISWC'], visibleRows.map((row) => [
+      exportCsvFile('publishing-catalogue', ['Title', 'Writer', 'Tempo ID', 'ISWC'], filteredRows.map((row) => [
         row.work_title || '',
         row.writers || '',
         row.tempo_id || '',
@@ -359,7 +396,7 @@ export default function CatalogueTables() {
       ]));
       return;
     }
-    exportCsvFile('label-catalogue', ['Artist', 'Title', 'Version / Mix', 'Release / Project', 'ISRC'], visibleRows.map((row) => [
+    exportCsvFile('label-catalogue', ['Artist', 'Title', 'Version / Mix', 'Release / Project', 'ISRC'], filteredRows.map((row) => [
       row.artist || '',
       row.track_title || '',
       row.version || '',
@@ -554,7 +591,7 @@ export default function CatalogueTables() {
   }
 
   function handleToggleAll(checked) {
-    setSelectedIds(checked ? new Set(visibleRows.map((row) => row.id)) : new Set());
+    setSelectedIds(checked ? new Set(pagedRows.map((row) => row.id)) : new Set());
   }
 
   function handleToggleRow(id, checked) {
@@ -601,7 +638,12 @@ export default function CatalogueTables() {
       ) : null}
       <CatalogueTable
         type={activeType}
-        rows={visibleRows}
+        rows={pagedRows}
+        totalRows={filteredRows.length}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        page={page}
+        totalPages={totalPages}
         linkedIds={linkedIds}
         busyId={busyKey}
         selectedIds={selectedIds}
@@ -616,6 +658,8 @@ export default function CatalogueTables() {
         onSearchChange={setSearch}
         sortOrder={sortOrder}
         onSortChange={setSortOrder}
+        onPrevPage={() => setPage((prev) => Math.max(1, prev - 1))}
+        onNextPage={() => setPage((prev) => Math.min(totalPages, prev + 1))}
         onExport={handleExport}
       />
     </section>

@@ -276,6 +276,27 @@ textarea {
   gap: 8px;
 }
 
+.list-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.list-pagination-range {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.list-pagination-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .shell-btn {
   border: 1px solid var(--border);
   background: var(--surface);

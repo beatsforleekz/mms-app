@@ -22,6 +22,8 @@ const GROUPS = [
   { key: 'done', label: 'Done' }
 ];
 
+const PAGE_SIZE = 100;
+
 function visibilityValue(value) {
   return String(value || '').toLowerCase() === 'personal' ? 'Personal' : 'Shared';
 }
@@ -93,6 +95,7 @@ export default function ActionsWorkspace() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorSaving, setEditorSaving] = useState(false);
   const [editor, setEditor] = useState(emptyEditor());
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -134,14 +137,32 @@ export default function ActionsWorkspace() {
       .sort(compareActions);
   }, [actions, userId, viewMode]);
 
+  const totalPages = Math.max(1, Math.ceil(visibleActions.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setPage(1);
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pagedActions = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return visibleActions.slice(start, start + PAGE_SIZE);
+  }, [visibleActions, page]);
+
   const groupedActions = useMemo(() => {
     return GROUPS.map((group) => ({
       ...group,
-      items: visibleActions.filter((action) => action.status === group.key)
+      items: pagedActions.filter((action) => action.status === group.key)
     })).filter((group) => group.items.length);
-  }, [visibleActions]);
+  }, [pagedActions]);
 
-  const allVisibleSelected = visibleActions.length > 0 && visibleActions.every((action) => selectedIds.has(action.id));
+  const allVisibleSelected = pagedActions.length > 0 && pagedActions.every((action) => selectedIds.has(action.id));
+
+  const rangeStart = visibleActions.length ? ((page - 1) * PAGE_SIZE) + 1 : 0;
+  const rangeEnd = visibleActions.length ? Math.min(page * PAGE_SIZE, visibleActions.length) : 0;
 
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -282,7 +303,7 @@ export default function ActionsWorkspace() {
                 checked={allVisibleSelected}
                 onChange={(event) => {
                   if (event.target.checked) {
-                    setSelectedIds(new Set(visibleActions.map((action) => action.id)));
+                    setSelectedIds(new Set(pagedActions.map((action) => action.id)));
                   } else {
                     setSelectedIds(new Set());
                   }
@@ -368,6 +389,15 @@ export default function ActionsWorkspace() {
           {error ? <div className="empty-block">{error}</div> : null}
           {loading ? <div className="loading-block">Loading actions…</div> : null}
           {!loading && !groupedActions.length ? <div className="empty-block">No actions yet.</div> : null}
+          {!loading && visibleActions.length ? (
+            <div className="list-pagination">
+              <span className="list-pagination-range">{rangeStart}-{rangeEnd} of {visibleActions.length}</span>
+              <div className="list-pagination-actions">
+                <button type="button" className="shell-btn" onClick={() => setPage((prev) => Math.max(1, prev - 1))} disabled={page <= 1}>Previous</button>
+                <button type="button" className="shell-btn" onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))} disabled={page >= totalPages}>Next</button>
+              </div>
+            </div>
+          ) : null}
 
           {!loading && groupedActions.length ? (
             <div className="actions-list">

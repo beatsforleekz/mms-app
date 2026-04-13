@@ -161,7 +161,12 @@
 
     /* ── Status & bool badges ── */
     .status-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .status-new      { background: var(--bg); color: var(--muted); }
     .status-signed   { background: #ecfdf5; color: #065f46; }
+    .status-progress { background: #eff6ff; color: #1d4ed8; }
+    .status-delivered { background: #fef3c7; color: #92400e; }
+    .status-released { background: #ede9fe; color: #6d28d9; }
+    .status-killed   { background: #fef2f2; color: #991b1b; }
     .status-unsigned { background: #fef2f2; color: #991b1b; }
     .status-default  { background: var(--bg); color: var(--muted); }
     .bool-yes { display: inline-flex; align-items: center; gap: 3px; background: #ecfdf5; color: #065f46; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -1166,6 +1171,9 @@
     .bulk-bar.visible { display:flex; }
     .bulk-bar .bulk-count { font-size:12px; color:var(--muted); font-weight:600; }
     .bulk-bar .bulk-actions { display:flex; gap:8px; align-items:center; }
+    .list-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; flex-wrap:wrap; }
+    .list-pagination-range { font-size:12px; color:var(--muted); font-weight:600; }
+    .list-pagination-actions { display:flex; gap:8px; align-items:center; }
     .select-cell { width:36px; text-align:center; }
     .select-cell input[type="checkbox"] { width:15px; height:15px; cursor:pointer; accent-color:var(--accent); }
     .stmt-feedback { font-size: 12px; }
@@ -1219,6 +1227,44 @@
       cursor: pointer; transition: all .12s; white-space: nowrap; margin-left: 4px;
     }
     .pipeline-del-btn:hover { background: #fef2f2; border-color: #fca5a5; }
+    .pipeline-row-actions {
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap;
+    }
+    .pipeline-status-toggle {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; color: var(--muted); cursor: pointer;
+    }
+    .pipeline-status-toggle input[type="checkbox"] {
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .pipeline-archive-wrap {
+      margin-top: 16px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+      display: none;
+    }
+    .pipeline-archive-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+    }
+    .pipeline-archive-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .pipeline-archive-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
 
     /* Payees standalone section in contract form */
     .contract-payees-section {
@@ -1739,6 +1785,36 @@
             </table>
           </div>
         </div>
+        <div class="pipeline-archive-wrap" id="releases-archive-wrap">
+          <div class="pipeline-archive-head">
+            <div>
+              <div class="pipeline-archive-title">Archive</div>
+              <div class="pipeline-archive-subtitle">Released and killed items are kept here and removed from the active pipeline.</div>
+            </div>
+          </div>
+          <div class="table-scroll-wrap">
+            <table class="data-table" id="releases-archive-table">
+              <thead>
+                <tr>
+                  <th style="width:36px;"></th>
+                  <th class="col-id">ID</th>
+                  <th class="col-title">Song / Work Title</th>
+                  <th class="col-artist">Artist</th>
+                  <th class="col-type">Type</th>
+                  <th class="col-role">Company Role</th>
+                  <th class="col-status">Status</th>
+                  <th class="col-completion">Completion<br><small style="font-weight:400;font-size:9px;text-transform:none;letter-spacing:0;">role-specific indicators</small></th>
+                  <th class="col-assets">Assets Complete?</th>
+                  <th class="col-date">Release / Deadline</th>
+                  <th class="col-owner">Owner</th>
+                  <th class="col-notes">Notes</th>
+                  <th style="width:180px;"></th>
+                </tr>
+              </thead>
+              <tbody id="releases-archive-tbody"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- ASSETS CHECKLIST -->
@@ -2065,6 +2141,13 @@
             </thead>
             <tbody id="contracts-tbody"></tbody>
           </table>
+          <div class="list-pagination" id="contracts-pagination" style="display:none;">
+            <span class="list-pagination-range" id="contracts-pagination-range">0-0 of 0</span>
+            <div class="list-pagination-actions">
+              <button class="btn btn-ghost" id="contracts-pagination-prev" type="button" style="font-size:12px;padding:6px 12px;">Previous</button>
+              <button class="btn btn-ghost" id="contracts-pagination-next" type="button" style="font-size:12px;padding:6px 12px;">Next</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -2299,6 +2382,13 @@
             </thead>
             <tbody id="payees-tbody"></tbody>
           </table>
+          <div class="list-pagination" id="payees-pagination" style="display:none;">
+            <span class="list-pagination-range" id="payees-pagination-range">0-0 of 0</span>
+            <div class="list-pagination-actions">
+              <button class="btn btn-ghost" id="payees-pagination-prev" type="button" style="font-size:12px;padding:6px 12px;">Previous</button>
+              <button class="btn btn-ghost" id="payees-pagination-next" type="button" style="font-size:12px;padding:6px 12px;">Next</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -2880,6 +2970,9 @@
     let currentVisibleActions = [];
     let currentVisiblePayees = [];
     let currentVisibleStatements = [];
+    const LIST_PAGE_SIZE = 100;
+    let contractsPage = 1;
+    let payeesPage = 1;
     const selectedReleaseIds = new Set();
     const selectedContractIds = new Set();
     const selectedActionIds = new Set();
@@ -2905,6 +2998,37 @@
 
     function lsWriteArray(key, arr) {
       localStorage.setItem(key, JSON.stringify(Array.isArray(arr) ? arr : []));
+    }
+
+    function paginateRows(rows, page, pageSize) {
+      const total = Array.isArray(rows) ? rows.length : 0;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const safePage = Math.min(Math.max(1, page || 1), totalPages);
+      const startIndex = (safePage - 1) * pageSize;
+      return {
+        rows: (rows || []).slice(startIndex, startIndex + pageSize),
+        total: total,
+        totalPages: totalPages,
+        page: safePage,
+        rangeStart: total ? startIndex + 1 : 0,
+        rangeEnd: total ? Math.min(startIndex + pageSize, total) : 0
+      };
+    }
+
+    function updateListPagination(prefix, meta) {
+      const wrap = document.getElementById(prefix + '-pagination');
+      const rangeEl = document.getElementById(prefix + '-pagination-range');
+      const prevBtn = document.getElementById(prefix + '-pagination-prev');
+      const nextBtn = document.getElementById(prefix + '-pagination-next');
+      if (!wrap || !rangeEl || !prevBtn || !nextBtn) return;
+      if (!meta || !meta.total) {
+        wrap.style.display = 'none';
+        return;
+      }
+      wrap.style.display = 'flex';
+      rangeEl.textContent = meta.rangeStart + '-' + meta.rangeEnd + ' of ' + meta.total;
+      prevBtn.disabled = meta.page <= 1;
+      nextBtn.disabled = meta.page >= meta.totalPages;
     }
 
     function catalogueNormalizeText(v) {
@@ -3085,6 +3209,7 @@
           type: entry.catalogue_type === 'publishing' ? 'Publishing' : 'Label',
           company_role: entry.catalogue_type === 'publishing' ? 'Publisher' : 'Label',
           status: entry.status || 'New',
+          raw_status: entry.status || 'New',
           release_date: null,
           owner: '',
           notes: '',
@@ -3109,6 +3234,7 @@
           type: 'Publishing',
           company_role: 'Publisher',
           status: entry.status || 'New',
+          raw_status: entry.status || 'New',
           release_date: null,
           owner: '',
           notes: source.tempo_id ? ('Tempo ID: ' + source.tempo_id) : '',
@@ -3132,6 +3258,7 @@
         type: 'Label',
         company_role: 'Label',
         status: entry.status || 'New',
+        raw_status: entry.status || 'New',
         release_date: null,
         owner: '',
         notes: source.release_title ? ('Release/Project: ' + source.release_title) : '',
@@ -3280,6 +3407,8 @@
     const elRelEmpty   = document.getElementById('releases-empty');
     const elRelWrap    = document.getElementById('releases-table-wrap');
     const elRelTbody   = document.getElementById('releases-tbody');
+    const elRelArchiveWrap = document.getElementById('releases-archive-wrap');
+    const elRelArchiveTbody = document.getElementById('releases-archive-tbody');
 
     const dbg = {
       set(id,t,c){ const el=document.getElementById(id); if(!el)return; el.textContent=t; el.className='debug-value'+(c?' '+c:''); },
@@ -3288,9 +3417,69 @@
       fetchError(t)   { dbg.set('dbg-fetch-error',t||'—',t?'debug-error':''); },
     };
 
-    function relShowLoading(msg){ elRelLoading.textContent=msg||'Loading releases…'; elRelLoading.style.display='block'; elRelError.style.display=elRelEmpty.style.display='none'; elRelWrap.style.display='none'; dbg.fetchStatus('Fetching…','debug-warn'); dbg.rowCount('—'); dbg.fetchError(''); }
-    function relShowError(msg) { elRelLoading.style.display='none'; elRelError.textContent='⚠ '+msg; elRelError.style.display='block'; elRelEmpty.style.display=elRelWrap.style.display='none'; dbg.fetchStatus('Error','debug-error'); dbg.rowCount('—'); dbg.fetchError(msg); }
+    function relShowLoading(msg){ elRelLoading.textContent=msg||'Loading releases…'; elRelLoading.style.display='block'; elRelError.style.display=elRelEmpty.style.display='none'; elRelWrap.style.display='none'; if (elRelArchiveWrap) elRelArchiveWrap.style.display='none'; dbg.fetchStatus('Fetching…','debug-warn'); dbg.rowCount('—'); dbg.fetchError(''); }
+    function relShowError(msg) { elRelLoading.style.display='none'; elRelError.textContent='⚠ '+msg; elRelError.style.display='block'; elRelEmpty.style.display=elRelWrap.style.display='none'; if (elRelArchiveWrap) elRelArchiveWrap.style.display='none'; dbg.fetchStatus('Error','debug-error'); dbg.rowCount('—'); dbg.fetchError(msg); }
     function relShowEmpty()    { elRelLoading.style.display=elRelError.style.display='none'; elRelEmpty.style.display='flex'; elRelWrap.style.display='none'; dbg.fetchStatus('Success — 0 rows','debug-warn'); dbg.rowCount('0'); dbg.fetchError(''); }
+
+    function isManualPipelineStatus(status) {
+      const normalized = String(status || '').toLowerCase().trim();
+      return normalized === 'released' || normalized === 'killed';
+    }
+
+    function normalizePipelineStatusLabel(status) {
+      const normalized = String(status || '').toLowerCase().trim();
+      if (normalized === 'released') return 'Released';
+      if (normalized === 'killed') return 'Killed';
+      if (normalized === 'delivered') return 'Delivered';
+      if (normalized === 'in progress' || normalized === 'in_progress') return 'In Progress';
+      if (normalized === 'signed') return 'Signed';
+      return 'New';
+    }
+
+    function statusBadgeClassForPipeline(status) {
+      const normalized = String(status || '').toLowerCase().trim();
+      if (normalized === 'signed') return 'status-signed';
+      if (normalized === 'in progress' || normalized === 'in_progress') return 'status-progress';
+      if (normalized === 'delivered') return 'status-delivered';
+      if (normalized === 'released') return 'status-released';
+      if (normalized === 'killed') return 'status-killed';
+      if (normalized === 'new') return 'status-new';
+      return 'status-default';
+    }
+
+    function anyAssetReceived(assetsCache) {
+      return (assetsCache || []).some(function(a) { return a && a.received === true; });
+    }
+
+    function deriveAutomaticPipelineStatus(releaseRow, assetsCache) {
+      const hasAssets = Array.isArray(assetsCache) && assetsCache.length > 0;
+      if (hasAssets) {
+        const comp = computeCompletion(assetsCache);
+        if (comp && comp.overall === true) return 'Delivered';
+        if (anyAssetReceived(assetsCache)) return 'In Progress';
+      }
+      if (signedContractExistsForRelease(releaseRow)) return 'Signed';
+      return 'New';
+    }
+
+    async function updatePipelineReferenceStatus(id, status) {
+      const rowId = String(id || '');
+      const nextStatus = String(status || '').trim();
+      if (!rowId) throw new Error('Missing pipeline entry id');
+      if (!db) {
+        const next = normalizePipelineReferenceEntries(lsReadArray(PIPELINE_REFERENCE_STORAGE_KEY)).map(function(entry) {
+          if (String(entry.id) !== rowId) return entry;
+          return Object.assign({}, entry, { status: nextStatus || 'New' });
+        });
+        lsWriteArray(PIPELINE_REFERENCE_STORAGE_KEY, next);
+        pipelineReferenceEntriesCache = next;
+        return;
+      }
+      const payload = nextStatus ? { status: nextStatus } : { status: 'New' };
+      const { error } = await db.from('catalogue_pipeline_links').update(payload).eq('id', rowId);
+      if (error) throw error;
+      await fetchPipelineReferenceEntries();
+    }
 
     function boolCell(val){ if(val===true)return'<span class="bool-yes">✓ Yes</span>'; if(val===false)return'<span class="bool-no">✗ No</span>'; return'<span class="bool-na">—</span>'; }
 
@@ -3501,7 +3690,17 @@
       try {
         await fetchCatalogueLookupData();
         await fetchPipelineReferenceEntries();
-        const pipelineRows = getPipelineReferenceEntries().map(buildPipelineReferenceRow);
+        const pipelineRows = getPipelineReferenceEntries().map(function(entry) {
+          const row = buildPipelineReferenceRow(entry);
+          const cachedAssets = getCachedAssetsForRelease(row);
+          const manualStatus = isManualPipelineStatus(entry.status) ? normalizePipelineStatusLabel(entry.status) : '';
+          row.status = manualStatus || deriveAutomaticPipelineStatus(row, cachedAssets);
+          row.manual_status = manualStatus;
+          row.raw_status = entry.status || 'New';
+          return row;
+        });
+        const activeRows = pipelineRows.filter(function(row) { return !row.manual_status; });
+        const archiveRows = pipelineRows.filter(function(row) { return !!row.manual_status; });
         dbg.fetchStatus('Loaded from catalogue references','debug-ok');
         dbg.rowCount(String(pipelineRows.length), pipelineRows.length>0?'debug-ok':'debug-warn');
         dbg.fetchError('');
@@ -3509,13 +3708,16 @@
         if (!pipelineRows.length) {
           updateBulkBar('releases-bulk-bar', 'releases-bulk-count', selectedReleaseIds);
           syncSelectAllCheckbox([], selectedReleaseIds, 'releases-select-all');
+          if (elRelArchiveWrap) elRelArchiveWrap.style.display = 'none';
           relShowEmpty();
           return [];
         }
 
-        elRelTbody.innerHTML = '';
-        pipelineRows.forEach(function(r) {
-          const sc = r.status&&r.status.toLowerCase().includes('signed')?'status-signed':r.status&&r.status.toLowerCase()==='unsigned'?'status-unsigned':'status-default';
+        function renderPipelineRows(targetBody, rows, archivedView) {
+          if (!targetBody) return;
+          targetBody.innerHTML = '';
+          rows.forEach(function(r) {
+          const sc = statusBadgeClassForPipeline(r.status);
           const dt = formatDateDisplay(r.release_date);
           const ne = escapeHtml(r.notes || '');
           const tr = document.createElement('tr');
@@ -3535,10 +3737,18 @@
           const checkedAttr = selectedReleaseIds.has(releaseIdStr) ? ' checked' : '';
           const titleDisplay = r.missing_catalogue_data ? 'Missing catalogue data' : (r.title || '—');
           const artistDisplay = r.artist || '—';
-          const editBtnHtml = '<button class="pipeline-edit-btn" data-id="'+r.id+'" disabled style="opacity:.55;cursor:not-allowed;" title="Catalogue-driven entry">Linked</button>';
+          const statusControlsHtml =
+            '<label class="pipeline-status-toggle" title="Mark this release as released">' +
+              '<input type="checkbox" data-release-override="released"' + (r.manual_status === 'Released' ? ' checked' : '') + ' />' +
+              '<span>Released</span>' +
+            '</label>' +
+            '<label class="pipeline-status-toggle" title="Mark this release as killed">' +
+              '<input type="checkbox" data-release-override="killed"' + (r.manual_status === 'Killed' ? ' checked' : '') + ' />' +
+              '<span>Killed</span>' +
+            '</label>';
 
           tr.innerHTML =
-            '<td><input type="checkbox" data-release-select="' + releaseIdStr + '"' + checkedAttr + ' aria-label="Select release" /></td>'+
+            '<td>' + (archivedView ? '' : '<input type="checkbox" data-release-select="' + releaseIdStr + '"' + checkedAttr + ' aria-label="Select release" />') + '</td>'+
             '<td class="col-id"><span class="id-display" title="' + rawId + '">' + shortId + '</span></td>'+
             '<td class="col-title"><strong>'+escapeHtml(titleDisplay)+'</strong></td>'+
             '<td class="col-artist">'+escapeHtml(artistDisplay)+'</td>'+
@@ -3550,18 +3760,33 @@
             '<td class="col-date">'+dt+'</td>'+
             '<td class="col-owner">'+escapeHtml(r.owner||'—')+'</td>'+
             '<td class="col-notes" title="'+ne+'">'+(ne||'—')+'</td>'+
-            '<td style="white-space:nowrap;">'+editBtnHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></td>';
+            '<td><div class="pipeline-row-actions">'+statusControlsHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></div></td>';
 
-          tr.querySelector('[data-release-select]').addEventListener('click', function(e) { e.stopPropagation(); });
-          tr.querySelector('[data-release-select]').addEventListener('change', function(e) {
-            if (e.target.checked) selectedReleaseIds.add(releaseIdStr);
-            else selectedReleaseIds.delete(releaseIdStr);
-            updateBulkBar('releases-bulk-bar', 'releases-bulk-count', selectedReleaseIds);
-            syncSelectAllCheckbox(pipelineRows.map(function(item) { return item.id; }), selectedReleaseIds, 'releases-select-all');
+          const selectEl = tr.querySelector('[data-release-select]');
+          if (selectEl) {
+            selectEl.addEventListener('click', function(e) { e.stopPropagation(); });
+            selectEl.addEventListener('change', function(e) {
+              if (e.target.checked) selectedReleaseIds.add(releaseIdStr);
+              else selectedReleaseIds.delete(releaseIdStr);
+              updateBulkBar('releases-bulk-bar', 'releases-bulk-count', selectedReleaseIds);
+              syncSelectAllCheckbox(activeRows.map(function(item) { return item.id; }), selectedReleaseIds, 'releases-select-all');
+            });
+          }
+
+          Array.from(tr.querySelectorAll('[data-release-override]')).forEach(function(input) {
+            input.addEventListener('click', function(e) { e.stopPropagation(); });
+            input.addEventListener('change', async function(e) {
+              try {
+                const override = e.target.getAttribute('data-release-override');
+                const nextStatus = e.target.checked ? normalizePipelineStatusLabel(override) : '';
+                await updatePipelineReferenceStatus(r.id, nextStatus);
+                await releaseTableRefresh();
+              } catch (err) {
+                alert('Status update failed: ' + (err.message || String(err)));
+              }
+            });
           });
 
-          // Wire edit button
-          // Wire delete button
           tr.querySelector('.pipeline-del-btn').addEventListener('click', async function(e) {
             e.stopPropagation();
             if (!confirm('Delete release "' + (titleDisplay||r.id) + '"?\n\nThis will permanently remove it from the pipeline. This cannot be undone.')) return;
@@ -3588,14 +3813,20 @@
               console.warn('[Release Pipeline] Failed to open release detail.', err);
             }
           });
-          elRelTbody.appendChild(tr);
+          targetBody.appendChild(tr);
         });
+        }
+
+        renderPipelineRows(elRelTbody, activeRows, false);
+        renderPipelineRows(elRelArchiveTbody, archiveRows, true);
 
         updateBulkBar('releases-bulk-bar', 'releases-bulk-count', selectedReleaseIds);
-        syncSelectAllCheckbox(pipelineRows.map(function(item) { return item.id; }), selectedReleaseIds, 'releases-select-all');
+        syncSelectAllCheckbox(activeRows.map(function(item) { return item.id; }), selectedReleaseIds, 'releases-select-all');
 
         elRelLoading.style.display = 'none';
-        elRelWrap.style.display    = 'block';
+        elRelEmpty.style.display = activeRows.length ? 'none' : 'flex';
+        elRelWrap.style.display    = activeRows.length ? 'block' : 'none';
+        if (elRelArchiveWrap) elRelArchiveWrap.style.display = archiveRows.length ? 'block' : 'none';
         currentReleasesData = pipelineRows;
         refreshReleaseMap(pipelineRows);
         return pipelineRows;
@@ -4946,11 +5177,15 @@
         }
         return true;
       });
-      currentVisibleContracts = rows.slice();
+      const pagination = paginateRows(rows, contractsPage, LIST_PAGE_SIZE);
+      contractsPage = pagination.page;
+      const pageRows = pagination.rows;
+      currentVisibleContracts = pageRows.slice();
 
       if (rows.length === 0) {
         syncSelectAllCheckbox([], selectedContractIds, 'contracts-select-all');
         updateBulkBar('contracts-bulk-bar', 'contracts-bulk-count', selectedContractIds);
+        updateListPagination('contracts', null);
         elContractsEmpty.style.display    = 'flex';
         elContractsTableWrap.style.display = 'none';
         elContractsEmpty.querySelector('.empty-body').textContent =
@@ -4964,7 +5199,7 @@
       elContractsTableWrap.style.display = 'block';
 
       elContractsTbody.innerHTML = '';
-      rows.forEach(function(c) {
+      pageRows.forEach(function(c) {
       const relTitle = contractLinkedReleaseLabel(c) || '';
         const ne = escapeHtml(c.notes || '');
         const payeesText = payeesSummary(c);
@@ -5001,7 +5236,7 @@
           if (e.target.checked) selectedContractIds.add(contractIdStr);
           else selectedContractIds.delete(contractIdStr);
           updateBulkBar('contracts-bulk-bar', 'contracts-bulk-count', selectedContractIds);
-          syncSelectAllCheckbox(rows.map(function(item) { return item.id; }), selectedContractIds, 'contracts-select-all');
+          syncSelectAllCheckbox(pageRows.map(function(item) { return item.id; }), selectedContractIds, 'contracts-select-all');
         });
         tr.querySelector('.edit-btn').addEventListener('click', function(e) { e.stopPropagation(); editContract(c); });
         tr.querySelector('.delete-btn').addEventListener('click', async function(e) {
@@ -5019,7 +5254,8 @@
         elContractsTbody.appendChild(tr);
       });
       updateBulkBar('contracts-bulk-bar', 'contracts-bulk-count', selectedContractIds);
-      syncSelectAllCheckbox(rows.map(function(item) { return item.id; }), selectedContractIds, 'contracts-select-all');
+      syncSelectAllCheckbox(pageRows.map(function(item) { return item.id; }), selectedContractIds, 'contracts-select-all');
+      updateListPagination('contracts', pagination);
     }
 
     // Save contract
@@ -5100,7 +5336,7 @@
 
     document.getElementById('contracts-add-btn').addEventListener('click', function() { resetContractForm(); showContractForm(); });
     document.getElementById('contract-cancel-btn').addEventListener('click', hideContractForm);
-    elContractSearch.addEventListener('input', function() { renderContractsTable(); });
+    elContractSearch.addEventListener('input', function() { contractsPage = 1; renderContractsTable(); });
     if (cfReleaseSearch) {
       cfReleaseSearch.addEventListener('focus', async function() {
         try {
@@ -5132,8 +5368,20 @@
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         contractsFilter = btn.dataset.status;
+        contractsPage = 1;
         renderContractsTable();
       });
+    });
+    const contractsPrevBtn = document.getElementById('contracts-pagination-prev');
+    const contractsNextBtn = document.getElementById('contracts-pagination-next');
+    if (contractsPrevBtn) contractsPrevBtn.addEventListener('click', function() {
+      if (contractsPage <= 1) return;
+      contractsPage -= 1;
+      renderContractsTable();
+    });
+    if (contractsNextBtn) contractsNextBtn.addEventListener('click', function() {
+      contractsPage += 1;
+      renderContractsTable();
     });
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -6462,7 +6710,10 @@
         if (!searchTerm) return true;
         return [(p.name||''),(p.email||''),(p.address||''),(p.notes||'')].join(' ').toLowerCase().includes(searchTerm);
       });
-      currentVisiblePayees = rows.slice();
+      const pagination = paginateRows(rows, payeesPage, LIST_PAGE_SIZE);
+      payeesPage = pagination.page;
+      const pageRows = pagination.rows;
+      currentVisiblePayees = pageRows.slice();
 
       const loadEl  = document.getElementById('payees-loading');
       const errEl   = document.getElementById('payees-error');
@@ -6477,6 +6728,7 @@
       if (!rows.length) {
         syncSelectAllCheckbox([], selectedPayeeIds, 'payees-select-all');
         updateBulkBar('payees-bulk-bar', 'payees-bulk-count', selectedPayeeIds);
+        updateListPagination('payees', null);
         if (emptyEl) { emptyEl.style.display = 'flex'; emptyEl.querySelector('.empty-body').textContent = searchTerm ? 'No payees match your search.' : 'Click "+ New Payee" to add your first payee.'; }
         if (tableContainer) tableContainer.style.display = 'none';
         return;
@@ -6485,7 +6737,7 @@
       if (tableContainer) tableContainer.style.display = '';
 
       tbody.innerHTML = '';
-      rows.forEach(function(p) {
+      pageRows.forEach(function(p) {
         const tr = document.createElement('tr');
         tr.dataset.payeeId = String(p.id);
         const ne = (p.notes||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -6505,7 +6757,7 @@
           if (e.target.checked) selectedPayeeIds.add(payeeIdStr);
           else selectedPayeeIds.delete(payeeIdStr);
           updateBulkBar('payees-bulk-bar', 'payees-bulk-count', selectedPayeeIds);
-          syncSelectAllCheckbox(rows.map(function(item) { return item.id; }), selectedPayeeIds, 'payees-select-all');
+          syncSelectAllCheckbox(pageRows.map(function(item) { return item.id; }), selectedPayeeIds, 'payees-select-all');
         });
         tr.querySelector('.payee-edit-row-btn').addEventListener('click', function(e) {
           e.stopPropagation();
@@ -6519,7 +6771,8 @@
         tbody.appendChild(tr);
       });
       updateBulkBar('payees-bulk-bar', 'payees-bulk-count', selectedPayeeIds);
-      syncSelectAllCheckbox(rows.map(function(item) { return item.id; }), selectedPayeeIds, 'payees-select-all');
+      syncSelectAllCheckbox(pageRows.map(function(item) { return item.id; }), selectedPayeeIds, 'payees-select-all');
+      updateListPagination('payees', pagination);
     }
 
     function initPayeesPage() {
@@ -6588,7 +6841,21 @@
 
       // Search
       const searchEl = get('payees-search');
-      if (searchEl) searchEl.addEventListener('input', renderPayeesPage);
+      if (searchEl) searchEl.addEventListener('input', function() {
+        payeesPage = 1;
+        renderPayeesPage();
+      });
+      const payeesPrevBtn = get('payees-pagination-prev');
+      const payeesNextBtn = get('payees-pagination-next');
+      if (payeesPrevBtn) payeesPrevBtn.addEventListener('click', function() {
+        if (payeesPage <= 1) return;
+        payeesPage -= 1;
+        renderPayeesPage();
+      });
+      if (payeesNextBtn) payeesNextBtn.addEventListener('click', function() {
+        payeesPage += 1;
+        renderPayeesPage();
+      });
     }
 
     // ══════════════════════════════════════════════════════════════════════════
