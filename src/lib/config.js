@@ -13,6 +13,7 @@ export const ROUTE_META = {
   '/actions': { title: 'Actions', subtitle: 'Operational task tracking ordered for day-to-day use.' },
   '/statements': { title: 'Statements', subtitle: 'Statement tracking, imports, and local storage workflows.' },
   '/contract-generator': { title: 'Doc Generator', subtitle: 'Plain-text document generation with reusable templates.' },
+  '/help': { title: 'Help', subtitle: 'A simple guide to using the app in the right workflow order.' },
   '/settings': { title: 'Settings', subtitle: 'Account access and basic security controls.' }
 };
 
@@ -26,5 +27,6 @@ export const NAV_ITEMS = [
   { href: '/actions', label: 'Actions' },
   { href: '/statements', label: 'Statements' },
   { href: '/contract-generator', label: 'Doc Generator' },
+  { href: '/help', label: 'Help' },
   { href: '/settings', label: 'Settings' }
 ];

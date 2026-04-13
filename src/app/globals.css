@@ -333,6 +333,41 @@ textarea {
   gap: 18px;
 }
 
+.help-section-body {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.help-section-body p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.help-steps {
+  display: grid;
+  gap: 18px;
+}
+
+.help-step {
+  display: grid;
+  gap: 8px;
+}
+
+.help-step h4 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.help-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+  line-height: 1.5;
+}
+
 .screen-grid {
   grid-template-columns: 1fr;
 }
