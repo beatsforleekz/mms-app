@@ -8038,19 +8038,50 @@ Best regards`;
     // ══════════════════════════════════════════════════════════════════════════
     //  CONTRACT GENERATOR (v38)
     // ══════════════════════════════════════════════════════════════════════════
-    const CGEN_STORAGE_KEY = 'leah_cgen_templates_v1';
+    let customDocTemplatesCache = [];
+
+    function normalizeDocTemplateRow(row) {
+      const customFields = Array.isArray(row && row.custom_fields)
+        ? row.custom_fields
+        : Array.isArray(row && row.customFields)
+          ? row.customFields
+          : [];
+      return {
+        id: String(row && row.id || ''),
+        name: String(row && row.name || '').trim(),
+        type: String(row && row.type || '').trim(),
+        body: String(row && row.body || ''),
+        customFields: customFields.map(function(field, index) {
+          const label = String(field && field.label || field && field.key || '').trim() || ('Field ' + (index + 1));
+          return {
+            label: label,
+            key: String(field && field.key || label).trim() || label,
+            inputType: String(field && field.inputType || field && field.input_type || 'text').trim() || 'text'
+          };
+        })
+      };
+    }
+
+    async function fetchCustomDocTemplates() {
+      if (!db) {
+        customDocTemplatesCache = [];
+        return customDocTemplatesCache.slice();
+      }
+      const { data, error } = await db
+        .from('contract_templates')
+        .select('id,name,type,body,custom_fields')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      customDocTemplatesCache = (data || []).map(normalizeDocTemplateRow);
+      return customDocTemplatesCache.slice();
+    }
 
     function loadCustomDocTemplates() {
-      try {
-        const raw = JSON.parse(localStorage.getItem(CGEN_STORAGE_KEY) || '[]');
-        return Array.isArray(raw) ? raw : [];
-      } catch (e) {
-        return [];
-      }
+      return customDocTemplatesCache.slice();
     }
 
     function getCustomDocTemplateTypes() {
-      return Array.from(new Set(loadCustomDocTemplates().map(function(t) {
+      return Array.from(new Set(customDocTemplatesCache.map(function(t) {
         return String(t && t.type || '').trim();
       }).filter(Boolean))).sort(function(a, b) {
         return a.localeCompare(b, undefined, { sensitivity: 'base' });
@@ -8082,9 +8113,15 @@ Best regards`;
 
       function get(id) { return document.getElementById(id); }
 
-      function cgenSaveSaved(arr) {
-        customTemplates = Array.isArray(arr) ? arr : [];
-        try { localStorage.setItem(CGEN_STORAGE_KEY, JSON.stringify(customTemplates)); } catch(e) {}
+      function cgenSetTemplates(rows) {
+        customTemplates = Array.isArray(rows) ? rows.slice() : [];
+        customDocTemplatesCache = customTemplates.slice();
+      }
+
+      async function cgenReloadTemplates() {
+        const rows = await fetchCustomDocTemplates();
+        cgenSetTemplates(rows);
+        return customTemplates;
       }
 
       function cgenGetTemplateTypes() {
@@ -8371,10 +8408,16 @@ Best regards`;
           });
         });
         list.querySelectorAll('.cgen-tpl-del-btn').forEach(function(btn) {
-          btn.addEventListener('click', function() {
+          btn.addEventListener('click', async function() {
             if (!confirm('Delete this template?')) return;
-            customTemplates = customTemplates.filter(function(t) { return t.id !== btn.dataset.id; });
-            cgenSaveSaved(customTemplates);
+            try {
+              const { error } = await db.from('contract_templates').delete().eq('id', btn.dataset.id);
+              if (error) throw error;
+              await cgenReloadTemplates();
+            } catch (err) {
+              alert('Delete failed: ' + (err.message || String(err)));
+              return;
+            }
             cgenRenderSavedTpls();
             cgenPopulateTypeSelect();
             cgenPopulateTplTypeSelect();
@@ -8385,7 +8428,7 @@ Best regards`;
         });
       }
 
-      function cgenSaveTemplate() {
+      async function cgenSaveTemplate() {
         const editingId = (get('cgen-editing-tpl-id').value || '').trim();
         const name = (get('cgen-tpl-name').value || '').trim();
         const type = tplTypeCombo.getValue();
@@ -8394,28 +8437,39 @@ Best regards`;
         if (!name) { fb.textContent = 'Template name required.'; fb.className = 'cgen-feedback error'; return; }
         if (!type) { fb.textContent = 'Contract type required.'; fb.className = 'cgen-feedback error'; return; }
         if (!body) { fb.textContent = 'Template body required.'; fb.className = 'cgen-feedback error'; return; }
+        if (!db) { fb.textContent = 'Supabase not initialised.'; fb.className = 'cgen-feedback error'; return; }
         const payload = {
-          id: editingId || ('custom_' + Date.now()),
           name: name,
           type: type,
           body: body,
-          customFields: tplCustomFieldRows.map(function(r, index) {
+          custom_fields: tplCustomFieldRows.map(function(r, index) {
             const label = (r.label || '').trim() || ('Field ' + (index + 1));
             return { label: label, key: label, inputType: r.inputType || 'text' };
           })
         };
-        if (editingId) {
-          customTemplates = customTemplates.map(function(t) { return t.id === editingId ? payload : t; });
-        } else {
-          customTemplates.push(payload);
+        try {
+          if (editingId) {
+            const { error } = await db.from('contract_templates').update(payload).eq('id', editingId);
+            if (error) throw error;
+          } else {
+            const { error } = await db.from('contract_templates').insert(payload);
+            if (error) throw error;
+          }
+          await cgenReloadTemplates();
+        } catch (err) {
+          fb.textContent = '⚠ ' + (err.message || String(err));
+          fb.className = 'cgen-feedback error';
+          return;
         }
-        cgenSaveSaved(customTemplates);
+        const savedTemplate = customTemplates.find(function(t) {
+          return t.name === name && t.type === type && t.body === body;
+        }) || customTemplates.find(function(t) { return t.id === editingId; }) || null;
         cgenRenderSavedTpls();
         cgenPopulateTypeSelect();
         cgenPopulateTplTypeSelect();
-        get('cgen-type-select').value = payload.type;
+        get('cgen-type-select').value = type;
         cgenPopulateTemplateSelect();
-        get('cgen-template-select').value = 'custom:' + payload.id;
+        if (savedTemplate && savedTemplate.id) get('cgen-template-select').value = 'custom:' + savedTemplate.id;
         cgenRenderCustomVarFields();
         cgenResetTemplateForm();
         get('cgen-add-tpl-panel').classList.add('hidden');
@@ -8424,7 +8478,13 @@ Best regards`;
         if (typeof refreshContractTypeOptions === 'function') refreshContractTypeOptions();
       }
 
-      function cgenInit() {
+      async function cgenInit() {
+        try {
+          await cgenReloadTemplates();
+        } catch (err) {
+          console.warn('[Doc Generator] Failed to load templates from Supabase:', err && err.message ? err.message : err);
+          cgenSetTemplates([]);
+        }
         cgenPopulateTypeSelect();
         cgenPopulateTplTypeSelect();
         cgenPopulateTemplateSelect();
@@ -8456,7 +8516,9 @@ Best regards`;
           tplCustomFieldRows.push({ label: '', key: '', inputType: 'text' });
           cgenRenderTplCustomFieldRows();
         });
-        get('cgen-save-tpl-btn').addEventListener('click', cgenSaveTemplate);
+        get('cgen-save-tpl-btn').addEventListener('click', function() {
+          cgenSaveTemplate();
+        });
         if (typeof refreshContractTypeOptions === 'function') refreshContractTypeOptions();
       }
 
