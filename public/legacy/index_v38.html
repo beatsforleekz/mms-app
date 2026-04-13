@@ -2590,7 +2590,7 @@
           <div style="display:flex;justify-content:space-between;align-items:flex-start;">
             <div>
               <h2>Doc Generator</h2>
-              <p>Select a contract type and template, fill in the variable fields, then copy the generated text.</p>
+              <p>Select a document type and template, fill in the variable fields, then copy the generated text.</p>
             </div>
             <button class="btn btn-ghost" id="cgen-show-add-tpl-btn">+ Add Template</button>
           </div>
@@ -2610,13 +2610,13 @@
               <input class="cgen-input" id="cgen-tpl-name" type="text" placeholder="e.g. Standard Remix v2" />
             </div>
             <div class="cgen-add-tpl-field">
-              <label class="cgen-label" for="cgen-tpl-type">Contract Type *</label>
+              <label class="cgen-label" for="cgen-tpl-type">Document Type *</label>
               <div class="combo-entry">
                 <select class="combo-select" id="cgen-tpl-type-select">
                   <option value="">— select type —</option>
                   <option value="__custom__">Custom…</option>
                 </select>
-                <input class="combo-input" id="cgen-tpl-type-custom" type="text" placeholder="or type a new contract type" />
+                <input class="combo-input" id="cgen-tpl-type-custom" type="text" placeholder="or type a new document type" />
               </div>
             </div>
             <div class="cgen-add-tpl-field full">
@@ -2651,10 +2651,10 @@
 
           <!-- LEFT: controls -->
           <div class="cgen-panel">
-            <div class="cgen-panel-title">Contract Setup</div>
+            <div class="cgen-panel-title">Document Setup</div>
 
             <div class="cgen-field">
-              <label class="cgen-label" for="cgen-type-select">Contract Type</label>
+              <label class="cgen-label" for="cgen-type-select">Document Type</label>
               <select class="cgen-select" id="cgen-type-select">
                 <option value="">— select type —</option>
               </select>
@@ -2670,19 +2670,19 @@
             <!-- Template fields — rendered by JS -->
             <div id="cgen-custom-var-fields"></div>
 
-            <button class="btn btn-primary" id="cgen-generate-btn" style="width:100%;margin-top:8px;justify-content:center;">⟳ Generate Contract</button>
+            <button class="btn btn-primary" id="cgen-generate-btn" style="width:100%;margin-top:8px;justify-content:center;">⟳ Generate Document</button>
           </div>
 
           <!-- RIGHT: output -->
           <div class="cgen-output-panel">
             <div class="cgen-output-header">
-              <div class="cgen-output-title">Generated Contract — editable</div>
+              <div class="cgen-output-title">Generated Document — editable</div>
               <div class="cgen-copy-btn-wrap">
                 <button class="btn btn-ghost" id="cgen-copy-btn" style="font-size:12px;padding:5px 12px;">⎘ Copy All</button>
                 <span class="cgen-copy-feedback" id="cgen-copy-feedback">Copied!</span>
               </div>
             </div>
-            <textarea class="cgen-output-textarea" id="cgen-output" placeholder="Generated contract text will appear here. You can edit it before copying."></textarea>
+            <textarea class="cgen-output-textarea" id="cgen-output" placeholder="Generated document text will appear here. You can edit it before copying."></textarea>
           </div>
 
         </div>
