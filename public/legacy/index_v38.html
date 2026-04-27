@@ -1569,6 +1569,32 @@
     .cgen-feedback.error { color: #b91c1c; }
 
     .cgen-tpl-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .cgen-saved-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .cgen-saved-toggle:hover { border-color: var(--accent); }
+    .cgen-saved-toggle-text {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+    }
+    .cgen-saved-toggle-ctl {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
     .cgen-tpl-item {
       display: flex; align-items: center; justify-content: space-between;
       padding: 8px 12px; background: var(--bg); border: 1px solid var(--border);
@@ -2742,8 +2768,11 @@
 
         <!-- Saved custom templates list (shown when any exist) -->
         <div id="cgen-saved-tpls-wrap" style="display:none;margin-bottom:var(--gap);">
-          <div class="cgen-section-label" style="margin-top:0;">Saved Custom Templates</div>
-          <div class="cgen-tpl-list" id="cgen-tpl-list"></div>
+          <button class="cgen-saved-toggle" id="cgen-saved-tpls-toggle" type="button" aria-expanded="false">
+            <span class="cgen-saved-toggle-text" id="cgen-saved-tpls-title">Saved Custom Templates (0)</span>
+            <span class="cgen-saved-toggle-ctl"><span id="cgen-saved-tpls-chev">▸</span> <span id="cgen-saved-tpls-action">Show</span></span>
+          </button>
+          <div class="cgen-tpl-list" id="cgen-tpl-list" style="display:none;margin-top:8px;"></div>
         </div>
 
         <!-- Main two-column layout: left = form, right = output -->
@@ -8310,6 +8339,7 @@ Best regards`;
       let cgenSingleSongLoadedKey = '';
       let cgenSingleSongFieldsState = {};
       let cgenSingleSongWriters = [];
+      let cgenSavedTemplatesExpanded = false;
       const CGEN_ULU_TEMPLATE_NAME = 'ULU Remix Agreement';
       const CGEN_ULU_EXCLUSIVITY_CLAUSE = 'Artist agrees not to release or authorise the release of any Artist recordings within 4 weeks prior to or post release. Artist shall use best endeavours to procure the taking down of any such competing releases.';
       const CGEN_ULU_ADVANCE_PAYMENT_CLAUSE = 'It will be paid as 100% on delivery and when acceptance by us of the Masters.';
@@ -10679,8 +10709,17 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
       function cgenRenderSavedTpls() {
         const wrap = get('cgen-saved-tpls-wrap');
         const list = get('cgen-tpl-list');
+        const title = get('cgen-saved-tpls-title');
+        const chev = get('cgen-saved-tpls-chev');
+        const action = get('cgen-saved-tpls-action');
+        const toggle = get('cgen-saved-tpls-toggle');
         if (!customTemplates.length) { wrap.style.display = 'none'; list.innerHTML = ''; return; }
         wrap.style.display = 'block';
+        if (title) title.textContent = 'Saved Custom Templates (' + customTemplates.length + ')';
+        if (list) list.style.display = cgenSavedTemplatesExpanded ? 'flex' : 'none';
+        if (chev) chev.textContent = cgenSavedTemplatesExpanded ? '▾' : '▸';
+        if (action) action.textContent = cgenSavedTemplatesExpanded ? 'Hide' : 'Show';
+        if (toggle) toggle.setAttribute('aria-expanded', cgenSavedTemplatesExpanded ? 'true' : 'false');
         list.innerHTML = '';
         customTemplates.forEach(function(t) {
           const div = document.createElement('div');
@@ -10819,6 +10858,10 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
         get('cgen-generate-btn').addEventListener('click', cgenGenerate);
         get('cgen-copy-btn').addEventListener('click', function() {
           cgenCopy();
+        });
+        get('cgen-saved-tpls-toggle').addEventListener('click', function() {
+          cgenSavedTemplatesExpanded = !cgenSavedTemplatesExpanded;
+          cgenRenderSavedTpls();
         });
         get('cgen-tpl-bold-btn').addEventListener('click', function() {
           const editor = cgenEditor();
