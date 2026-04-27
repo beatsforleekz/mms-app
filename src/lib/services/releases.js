@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '@/lib/supabase/client';
 const RELEASE_NOTES_STORAGE_KEY = 'release_detail_notes';
+const RELEASE_META_STORAGE_KEY = 'pipeline_release_meta_v1';
 
 function normalizeText(value) {
   return String(value == null ? '' : value).trim();
@@ -86,6 +87,15 @@ function getReleaseNotesMap() {
   return readStorageObject(RELEASE_NOTES_STORAGE_KEY);
 }
 
+function getReleaseMetaMap() {
+  return readStorageObject(RELEASE_META_STORAGE_KEY);
+}
+
+function getReleaseMeta(releaseId) {
+  const metaMap = getReleaseMetaMap();
+  return metaMap[normalizeText(releaseId)] || {};
+}
+
 export function getReleaseNote(releaseId) {
   const notesMap = getReleaseNotesMap();
   return normalizeText(notesMap[normalizeText(releaseId)]);
@@ -132,6 +142,7 @@ export async function fetchReleaseById(releaseId, catalogueId = '', catalogueTyp
   if (!entry || !entry.catalogue_id) return null;
   const source = await fetchCatalogueSource(entry);
   const savedNote = getReleaseNote(entry.id);
+  const savedMeta = getReleaseMeta(entry.id);
   if (!source) return null;
 
   if (entry.catalogue_type === 'publishing') {
@@ -139,15 +150,15 @@ export async function fetchReleaseById(releaseId, catalogueId = '', catalogueTyp
       id: entry.id,
       catalogue_id: entry.catalogue_id,
       catalogue_type: entry.catalogue_type,
-      title: source.work_title || '—',
-      artist: source.writers || '—',
-      type: 'Publishing',
-      company_role: 'Publisher',
+      title: savedMeta.title || source.work_title || '—',
+      artist: savedMeta.artist || source.writers || '—',
+      type: savedMeta.type || 'Publishing',
+      company_role: savedMeta.company_role || 'Publisher',
       status: entry.status || 'New',
-      release_date: null,
-      owner: '',
+      release_date: savedMeta.release_date || null,
+      owner: savedMeta.owner || '',
       notes: savedNote || '',
-      isrc: source.iswc || '',
+      isrc: savedMeta.isrc || source.iswc || '',
       missing_catalogue_data: false
     };
   }
@@ -156,15 +167,15 @@ export async function fetchReleaseById(releaseId, catalogueId = '', catalogueTyp
     id: entry.id,
     catalogue_id: entry.catalogue_id,
     catalogue_type: entry.catalogue_type,
-    title: source.track_title || '—',
-    artist: source.artist || '—',
-    type: 'Label',
-    company_role: 'Label',
+    title: savedMeta.title || source.track_title || '—',
+    artist: savedMeta.artist || source.artist || '—',
+    type: savedMeta.type || 'Label',
+    company_role: savedMeta.company_role || 'Label',
     status: entry.status || 'New',
-    release_date: null,
-    owner: '',
+    release_date: savedMeta.release_date || null,
+    owner: savedMeta.owner || '',
     notes: savedNote || '',
-    isrc: source.isrc || '',
+    isrc: savedMeta.isrc || source.isrc || '',
     missing_catalogue_data: false
   };
 }

@@ -1435,19 +1435,70 @@
       font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: .07em; color: var(--muted);
     }
-    .cgen-output-textarea {
-      width: 100%; min-height: 540px;
+    .cgen-rich-editor,
+    .cgen-output-preview {
+      width: 100%; min-height: 260px;
       padding: 14px; border: 1px solid var(--border); border-radius: var(--radius);
-      font-family: 'Courier New', monospace; font-size: 12.5px; line-height: 1.65;
+      font-family: Georgia, 'Times New Roman', serif; font-size: 14px; line-height: 1.65;
       color: var(--text); background: #fafafa;
-      resize: vertical; outline: none; transition: border-color .12s;
+      outline: none; transition: border-color .12s;
+      white-space: normal; overflow: auto;
     }
-    .cgen-output-textarea:focus { border-color: var(--accent); background: #fff; }
+    .cgen-rich-editor:focus,
+    .cgen-output-preview:focus { border-color: var(--accent); background: #fff; }
+    .cgen-rich-editor {
+      min-height: 320px;
+    }
+    .cgen-output-preview {
+      min-height: 540px;
+    }
+    .cgen-rich-editor p,
+    .cgen-output-preview p {
+      margin: 0 0 1em;
+    }
+    .cgen-rich-editor p:last-child,
+    .cgen-output-preview p:last-child {
+      margin-bottom: 0;
+    }
+    .cgen-rich-editor strong,
+    .cgen-output-preview strong {
+      font-weight: 700;
+    }
+    .cgen-rich-editor [data-placeholder]:empty::before {
+      content: attr(data-placeholder);
+      color: #999;
+      pointer-events: none;
+    }
+    .cgen-editor-tools {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .cgen-editor-help {
+      font-size: 12px; color: var(--muted);
+    }
 
     .cgen-custom-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
     .cgen-custom-field-row {
       display: grid; grid-template-columns: 1fr 80px 28px;
       gap: 6px; align-items: center;
+    }
+    .cgen-remixers-group {
+      display: flex; flex-direction: column; gap: 10px; margin-top: 10px;
+    }
+    .cgen-remixer-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .cgen-remixer-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .cgen-remixer-title {
+      font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
     }
     .cgen-remove-btn {
       background: none; border: none; cursor: pointer; color: var(--muted);
@@ -2621,7 +2672,16 @@
             </div>
             <div class="cgen-add-tpl-field full">
               <label class="cgen-label" for="cgen-tpl-body">Template Body *</label>
-              <textarea class="cgen-textarea" id="cgen-tpl-body" rows="10" placeholder="Paste your template text here. Use {{FIELD_KEY}} to insert variable fields. e.g. {{ARTIST_NAME}}, {{DATE}}, {{ADVANCE}}"></textarea>
+              <div class="cgen-editor-tools">
+                <button class="btn btn-ghost" id="cgen-tpl-bold-btn" type="button" style="font-size:12px;padding:5px 12px;"><strong>B</strong> Bold</button>
+                <span class="cgen-editor-help">Use Enter for paragraphs and Shift+Enter for line breaks. Placeholders like {{Recipient Names}} also work inside bold text.</span>
+              </div>
+              <div
+                class="cgen-rich-editor"
+                id="cgen-tpl-body"
+                contenteditable="true"
+                data-placeholder="Paste or type your template here using HTML formatting. Use {{Recipient Names}}, {{Event Name}}, {{Event Date}}, {{Venue Address}}, {{Signer Name}}, {{Signer Title}} inside the template."
+              ></div>
             </div>
           </div>
 
@@ -2678,11 +2738,11 @@
             <div class="cgen-output-header">
               <div class="cgen-output-title">Generated Document — editable</div>
               <div class="cgen-copy-btn-wrap">
-                <button class="btn btn-ghost" id="cgen-copy-btn" style="font-size:12px;padding:5px 12px;">⎘ Copy All</button>
+                <button class="btn btn-ghost" id="cgen-copy-btn" style="font-size:12px;padding:5px 12px;">Copy Generated Document</button>
                 <span class="cgen-copy-feedback" id="cgen-copy-feedback">Copied!</span>
               </div>
             </div>
-            <textarea class="cgen-output-textarea" id="cgen-output" placeholder="Generated document text will appear here. You can edit it before copying."></textarea>
+            <div class="cgen-output-preview" id="cgen-output" contenteditable="true"></div>
           </div>
 
         </div>
@@ -3199,26 +3259,27 @@
     }
 
     function buildPipelineReferenceRow(entry) {
+      const meta = getReleaseMeta(entry.id);
       const source = resolveCatalogueRow(entry.catalogue_type, entry.catalogue_id);
       if (!source) {
         return {
           id: entry.id,
-          internal_id: '',
+          internal_id: meta.internal_id || '',
           title: 'Missing catalogue data',
-          artist: entry.catalogue_type === 'publishing' ? 'Publishing catalogue entry unavailable' : 'Label catalogue entry unavailable',
-          type: entry.catalogue_type === 'publishing' ? 'Publishing' : 'Label',
-          company_role: entry.catalogue_type === 'publishing' ? 'Publisher' : 'Label',
+          artist: meta.artist || (entry.catalogue_type === 'publishing' ? 'Publishing catalogue entry unavailable' : 'Label catalogue entry unavailable'),
+          type: meta.type || (entry.catalogue_type === 'publishing' ? 'Publishing' : 'Label'),
+          company_role: meta.company_role || (entry.catalogue_type === 'publishing' ? 'Publisher' : 'Label'),
           status: entry.status || 'New',
           raw_status: entry.status || 'New',
-          release_date: null,
+          release_date: meta.release_date || null,
           owner: '',
-          notes: '',
-          isrc: '',
-          contract_received: false,
-          registrations_complete: false,
-          uploads_complete: false,
-          added_to_pub_cat: false,
-          registered_with_sony: false,
+          notes: meta.notes || '',
+          isrc: meta.isrc || '',
+          contract_received: meta.contract_received === true,
+          registrations_complete: meta.registrations_complete === true,
+          uploads_complete: meta.uploads_complete === true,
+          added_to_pub_cat: meta.added_to_pub_cat === true,
+          registered_with_sony: meta.registered_with_sony === true,
           is_catalogue_reference: true,
           missing_catalogue_data: true,
           catalogue_id: entry.catalogue_id,
@@ -3228,22 +3289,22 @@
       if (entry.catalogue_type === 'publishing') {
         return {
           id: entry.id,
-          internal_id: '',
-          title: source.work_title || '—',
-          artist: source.writers || '—',
-          type: 'Publishing',
-          company_role: 'Publisher',
+          internal_id: meta.internal_id || '',
+          title: meta.title || source.work_title || '—',
+          artist: meta.artist || source.writers || '—',
+          type: meta.type || 'Publishing',
+          company_role: meta.company_role || 'Publisher',
           status: entry.status || 'New',
           raw_status: entry.status || 'New',
-          release_date: null,
+          release_date: meta.release_date || null,
           owner: '',
-          notes: source.tempo_id ? ('Tempo ID: ' + source.tempo_id) : '',
-          isrc: '',
-          contract_received: false,
-          registrations_complete: false,
-          uploads_complete: false,
-          added_to_pub_cat: false,
-          registered_with_sony: false,
+          notes: meta.notes || (source.tempo_id ? ('Tempo ID: ' + source.tempo_id) : ''),
+          isrc: meta.isrc || '',
+          contract_received: meta.contract_received === true,
+          registrations_complete: meta.registrations_complete === true,
+          uploads_complete: meta.uploads_complete === true,
+          added_to_pub_cat: meta.added_to_pub_cat === true,
+          registered_with_sony: meta.registered_with_sony === true,
           is_catalogue_reference: true,
           missing_catalogue_data: false,
           catalogue_id: entry.catalogue_id,
@@ -3252,22 +3313,22 @@
       }
       return {
         id: entry.id,
-        internal_id: '',
-        title: source.track_title || '—',
-        artist: source.artist || '—',
-        type: 'Label',
-        company_role: 'Label',
+        internal_id: meta.internal_id || '',
+        title: meta.title || source.track_title || '—',
+        artist: meta.artist || source.artist || '—',
+        type: meta.type || 'Label',
+        company_role: meta.company_role || 'Label',
         status: entry.status || 'New',
         raw_status: entry.status || 'New',
-        release_date: null,
+        release_date: meta.release_date || null,
         owner: '',
-        notes: source.release_title ? ('Release/Project: ' + source.release_title) : '',
-        isrc: source.isrc || '',
-        contract_received: false,
-        registrations_complete: false,
-        uploads_complete: false,
-        added_to_pub_cat: false,
-        registered_with_sony: false,
+        notes: meta.notes || (source.release_title ? ('Release/Project: ' + source.release_title) : ''),
+        isrc: meta.isrc || source.isrc || '',
+        contract_received: meta.contract_received === true,
+        registrations_complete: meta.registrations_complete === true,
+        uploads_complete: meta.uploads_complete === true,
+        added_to_pub_cat: meta.added_to_pub_cat === true,
+        registered_with_sony: meta.registered_with_sony === true,
         is_catalogue_reference: true,
         missing_catalogue_data: false,
         catalogue_id: entry.catalogue_id,
@@ -3746,6 +3807,7 @@
               '<input type="checkbox" data-release-override="killed"' + (r.manual_status === 'Killed' ? ' checked' : '') + ' />' +
               '<span>Killed</span>' +
             '</label>';
+          const editBtnHtml = '<button class="contract-row-btn pipeline-edit-btn" data-id="'+r.id+'">Edit</button>';
 
           tr.innerHTML =
             '<td>' + (archivedView ? '' : '<input type="checkbox" data-release-select="' + releaseIdStr + '"' + checkedAttr + ' aria-label="Select release" />') + '</td>'+
@@ -3760,7 +3822,7 @@
             '<td class="col-date">'+dt+'</td>'+
             '<td class="col-owner">'+escapeHtml(r.owner||'—')+'</td>'+
             '<td class="col-notes" title="'+ne+'">'+(ne||'—')+'</td>'+
-            '<td><div class="pipeline-row-actions">'+statusControlsHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></div></td>';
+            '<td><div class="pipeline-row-actions">'+editBtnHtml+statusControlsHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></div></td>';
 
           const selectEl = tr.querySelector('[data-release-select]');
           if (selectEl) {
@@ -3787,6 +3849,10 @@
             });
           });
 
+          tr.querySelector('.pipeline-edit-btn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            openReleaseEdit(r);
+          });
           tr.querySelector('.pipeline-del-btn').addEventListener('click', async function(e) {
             e.stopPropagation();
             if (!confirm('Delete release "' + (titleDisplay||r.id) + '"?\n\nThis will permanently remove it from the pipeline. This cannot be undone.')) return;
@@ -4509,6 +4575,7 @@
 
     const typeCombo   = comboEntry(cfTypeSelect,   cfTypeCustom,   '__custom__');
     const senderCombo = comboEntry(cfSenderSelect,  cfSenderCustom, '__custom__');
+    const DEFAULT_CONTRACT_TYPES = ['Master', 'Publishing', 'Single Song Assignment', 'Remix', 'Add-Producer', 'Producer'];
 
     // ── Eddy calculator visibility ────────────────────────────────────────────
     // Hide for: Publishing, Single Song Assignment
@@ -5395,6 +5462,7 @@
     const elReleaseEditPanel    = document.getElementById('release-edit-panel');
     const elReleaseEditFeedback = document.getElementById('release-edit-feedback');
     const elReleaseEditHeading  = document.getElementById('release-edit-heading');
+    const RELEASE_META_STORAGE_KEY = 'pipeline_release_meta_v1';
 
     // Field refs — read directly from the DOM at save time; no intermediate state cache
     const reId                  = document.getElementById('re-id');
@@ -5427,6 +5495,30 @@
       if (!elReleaseStartFeedback) return;
       elReleaseStartFeedback.textContent = msg || '';
       elReleaseStartFeedback.className = 'release-edit-feedback' + (type ? ' ' + type : '');
+    }
+
+    function getReleaseMetaMap() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(RELEASE_META_STORAGE_KEY) || '{}');
+        return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+      } catch (err) {
+        return {};
+      }
+    }
+
+    function getReleaseMeta(releaseId) {
+      const map = getReleaseMetaMap();
+      const key = String(releaseId || '');
+      return key ? (map[key] || {}) : {};
+    }
+
+    function saveReleaseMeta(releaseId, payload) {
+      const key = String(releaseId || '');
+      if (!key) throw new Error('Missing release id');
+      const next = getReleaseMetaMap();
+      next[key] = Object.assign({}, next[key] || {}, payload || {});
+      localStorage.setItem(RELEASE_META_STORAGE_KEY, JSON.stringify(next));
+      return next[key];
     }
 
     function getReleaseStartMatches() {
@@ -5578,7 +5670,33 @@
 
     // ── openReleaseEdit — EDIT mode ─────────────────────────────────────────────
     function openReleaseEdit(r) {
-      console.warn('[Master Pipeline] Legacy release editing is disabled. Pipeline rows are catalogue-driven references only.', { id: r && r.id });
+      if (!r) return;
+      const meta = getReleaseMeta(r.id);
+      reId.value = r.id || '';
+      reInternalId.value = meta.internal_id || r.internal_id || '';
+      reTitle.value = meta.title || r.title || '';
+      reArtist.value = meta.artist || r.artist || '';
+      reType.value = meta.type || r.type || '';
+      reCompanyRole.value = meta.company_role || r.company_role || '';
+      reStatus.value = r.status || 'New';
+      reReleaseDate.value = meta.release_date || r.release_date || '';
+      reIsrc.value = meta.isrc || r.isrc || '';
+      reNotes.value = meta.notes || r.notes || '';
+      reContractReceived.checked = meta.contract_received != null ? !!meta.contract_received : !!r.contract_received;
+      reUploadsComplete.checked = meta.uploads_complete != null ? !!meta.uploads_complete : !!r.uploads_complete;
+      reRegistrationsComp.checked = meta.registrations_complete != null ? !!meta.registrations_complete : !!r.registrations_complete;
+      reAddedToPubCat.checked = meta.added_to_pub_cat != null ? !!meta.added_to_pub_cat : !!r.added_to_pub_cat;
+      reRegisteredWithSony.checked = meta.registered_with_sony != null ? !!meta.registered_with_sony : !!r.registered_with_sony;
+      elReleaseEditHeading.textContent = '✎ Edit Release';
+      setReleaseFeedback('', '');
+      if (elReleaseStartPanel) elReleaseStartPanel.classList.add('hidden');
+      elReleaseEditPanel.classList.remove('hidden');
+      document.querySelectorAll('#releases-tbody tr.editing, #releases-archive-tbody tr.editing').forEach(function(tr) {
+        tr.classList.remove('editing');
+      });
+      document.querySelectorAll('tr[data-release-id]').forEach(function(tr) {
+        tr.classList.toggle('editing', String(tr.dataset.releaseId) === String(r.id));
+      });
     }
 
     // ── openNewRelease — INSERT mode ────────────────────────────────────────────
@@ -5609,8 +5727,34 @@
 
     // ── Save handler — INSERT or UPDATE based on whether re-id is populated ─────
     document.getElementById('release-edit-save-btn').addEventListener('click', async function() {
-      console.warn('[Master Pipeline] Blocked legacy release save. Pipeline rows are catalogue references only.');
-      setReleaseFeedback('⚠ Legacy release editing is disabled.', 'error');
+      const releaseId = reId.value || '';
+      if (!releaseId) {
+        setReleaseFeedback('⚠ Missing release id.', 'error');
+        return;
+      }
+      try {
+        const payload = buildReleasePayload();
+        saveReleaseMeta(releaseId, {
+          internal_id: payload.internal_id,
+          title: payload.title,
+          artist: payload.artist,
+          type: payload.type,
+          company_role: payload.company_role,
+          release_date: payload.release_date,
+          notes: payload.notes,
+          isrc: payload.isrc,
+          contract_received: payload.contract_received,
+          uploads_complete: payload.uploads_complete,
+          registrations_complete: payload.registrations_complete,
+          added_to_pub_cat: payload.added_to_pub_cat,
+          registered_with_sony: payload.registered_with_sony
+        });
+        setReleaseFeedback('✓ Saved', 'ok');
+        await releaseTableRefresh();
+        closeReleaseEdit();
+      } catch (err) {
+        setReleaseFeedback('⚠ ' + (err.message || String(err)), 'error');
+      }
     });
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -8090,7 +8234,14 @@ Best regards`;
 
     function refreshContractTypeOptions() {
       if (!cfTypeSelect) return;
-      const types = getCustomDocTemplateTypes();
+      const types = Array.from(new Set(DEFAULT_CONTRACT_TYPES.concat(getCustomDocTemplateTypes()))).sort(function(a, b) {
+        const aDefault = DEFAULT_CONTRACT_TYPES.indexOf(a);
+        const bDefault = DEFAULT_CONTRACT_TYPES.indexOf(b);
+        if (aDefault >= 0 && bDefault >= 0) return aDefault - bDefault;
+        if (aDefault >= 0) return -1;
+        if (bDefault >= 0) return 1;
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
       const currentValue = typeCombo.getValue();
       cfTypeSelect.innerHTML = '<option value="">— select type —</option>';
       types.forEach(function(type) {
@@ -8110,11 +8261,1191 @@ Best regards`;
 
       let customTemplates = loadCustomDocTemplates();
       let tplCustomFieldRows = [];
+      let cgenRemixerRows = [];
+      let cgenRemixersLoadedKey = '';
+      let cgenUluMasterLoadedKey = '';
+      let cgenUluMasterFieldsState = {};
+      let cgenUluMasterArtists = [];
+      let cgenUluMasterMasters = [];
+      let cgenSingleSongLoadedKey = '';
+      let cgenSingleSongFieldsState = {};
+      let cgenSingleSongWriters = [];
+      const CGEN_ULU_TEMPLATE_NAME = 'ULU Remix Agreement';
+      const CGEN_ULU_EXCLUSIVITY_CLAUSE = 'Artist agrees not to release or authorise the release of any Artist recordings within 4 weeks prior to or post release. Artist shall use best endeavours to procure the taking down of any such competing releases.';
+      const CGEN_ULU_ADVANCE_PAYMENT_CLAUSE = 'It will be paid as 100% on delivery and when acceptance by us of the Masters.';
+      const CGEN_ULU_ADVANCE_CLAUSE_HTML = '<p><strong>3. ADVANCES</strong></p><p>You will receive the sum of {{Advance Amount}} ({{Advance Amount Words}}) paid as an advance inclusive of all recording costs. It will be paid as 100% on delivery and when acceptance by us of the Masters.</p>';
+      const CGEN_ULU_BONUS_CLAUSE_HTML = '<p><strong>4.1</strong><br>You will be entitled to receive a bonus of {{Bonus 1 Amount}} ({{Bonus 1 Amount Words}}) if the remix reaches {{Bonus 1 Trigger}}.</p>';
+      const CGEN_ULU_TO_BLOCK_HTML = '<p><strong>TO:</strong><br><br>{{Remixers Block}}<br>Pka {{Artist PKA}}<br>("you")</p>';
+      const CGEN_ULU_COMPANY_NAME = 'Music Matters BYpittbull Ltd';
+      const CGEN_REMIXERS_STORAGE_KEY = 'cgen_remixers_v1';
+      const CGEN_ULU_REMIX_STATE_STORAGE_KEY = 'cgen_ulu_remix_state_v1';
+      const CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_NAME = 'Music Matters Songs Exclusive Publishing Agreement';
+      const CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_TYPE = 'Publishing Agreement';
+      const CGEN_MMS_EXCLUSIVE_PUBLISHING_STATE_STORAGE_KEY = 'cgen_mms_exclusive_publishing_state_v1';
+      const CGEN_DOC_TYPES_STORAGE_KEY = 'cgen_doc_types_v1';
+      const CGEN_DOC_TYPE_ADD_VALUE = '__add_type__';
+      const CGEN_ULU_MASTER_TEMPLATE_NAME = 'Ulu Records Master Agreement';
+      const CGEN_ULU_MASTER_TEMPLATE_TYPE = 'Master Agreement';
+      const CGEN_ULU_MASTER_STATE_STORAGE_KEY = 'cgen_ulu_master_state_v1';
+      const CGEN_ULU_MASTER_TEMPLATE_BODY_HTML = `<p><strong>SUBJECT TO CONTRACT SIGNED BY ALL PARTIES</strong></p>
+
+<br>
+
+<p><strong>Date:</strong>&nbsp;&nbsp;&nbsp;&nbsp;{{Date}}</p>
+
+<br>
+
+<p>
+(A) Music Matters BYpittbull ltd t/a Ulu Records, a company incorporated in England and Wales with registered number 06134752, having its registered office at Unit 2, Office 10, 465C Hornsey Road, London N19 4DR (“Label”); and
+</p>
+
+<p>And</p>
+
+<p>
+(B) {{Artists Block}} (“Artist”)
+</p>
+
+<p><strong>1) TERRITORY</strong><br>
+The World & The Universe
+</p>
+
+<p><strong>2) TERM</strong><br>
+A period commencing on the Date of one (1) month before release and expiring on the date that is one (1) month following Label’s release of the final Master forming the Product Commitment.
+</p>
+
+<p>
+PLEASE NOTE; If “Artist” fails to comply, “Label” will be entitled to cease all marketing spend and delay release as they see fit. This will not be breach of contract and “Label” will still own master.
+</p>
+
+<p><strong>3) PRODUCT COMMITMENT</strong><br>
+Promptly following signature, Artist agrees to deliver to Label:
+</p>
+
+<p>
+{{Masters Block}}
+</p>
+
+<p>
+(and all available artwork and videos).<br>
+Can be released as singles or bundled together as an EP or Compilation.
+</p>
+
+<p>
+Each master recording delivered hereunder shall consist of one (1) fully mixed mastered and cleared recording of Artist’s headline performance of a previously unreleased composition and shall be subject to Label’s reasonable delivery requirements (“Masters”) and all needed edits and stems.
+</p>
+
+<p>
+You hereby confirm that you agree to support the releases across all your social media platforms, to post, repost and use swipe ups where applicable; and to fulfil any appropriate online promotion requests as requested by label.
+</p>
+
+<p><strong>4) RECORDING</strong><br>
+Artist is solely responsible for all recording costs hereunder.
+</p>
+
+<p><strong>5) RELEASE</strong><br>
+In UK within the later of six (6) months from delivery and acceptance in writing of all Masters forming the Product Commitment subject to a two (2) month cure period running from Artist’s written notice to Label detailing Label’s failure to release as aforesaid.&nbsp; Failure by Label to release as required above gives Artist the right to terminate the Term provided Artist is not in breach hereof.&nbsp;
+</p>
+
+<p>
+NB: 1st November – 30th January do not count for the purposes of Label’s release obligations.
+</p>
+
+<p><strong>6) OPTIONS</strong><br>
+{{Options Text}}
+</p>
+
+<p><strong>7) ADVANCE</strong><br>
+Following signature of this agreement by both parties, Label shall make payment to Company and Artist an advance of {{Advance Amount Words}} ({{Advance Amount Number}}) plus VAT if applicable (”Advance”). Company and Artist acknowledges payment hereof by signing this agreement.
+</p>
+
+<p><strong>8) ROYALTIES</strong><br>
+Label shall account to Artist for fifty per cent (50%) of Label’s Net Receipts (the “Artist’s Royalty”) following recoupment of any advances from such royalty. Artist’s Royalty shall be accounted and paid in pounds sterling.
+</p>
+
+<p>
+“Net Receipts” shall mean Gross Income less VAT (or any similar sales taxes) and after recovery of the Expenses.
+</p>
+
+<p>
+“Gross Income” shall mean any monies actually received by Label (or credited to Label against an advance in which Artist has not shared) in the United Kingdom which are solely, directly and identifiably attributable to the exploitation of the Masters delivered hereunder.
+</p>
+
+<p>
+“Expenses” shall mean the aggregate of any and all expenses and costs incurred by Label or on Label’s behalf (excluding Label’s general overhead costs) in connection with the Masters and other materials hereunder.
+</p>
+
+<p>
+For the avoidance of any doubt and notwithstanding any of the foregoing, Label shall be entitled to retain for its own sole account the so-called “label share” of performance income (i.e. PPL and similar. Artist shall be entitled to receive the so-called “performer’s share” direct from the relevant collection societies (subject to any portion thereof being payable to third party performers).
+</p>
+
+<p>
+All sums payable hereunder shall be subject to the deduction or withholding of all taxes required to be deducted or withheld under the laws of any country or territory and to the exchange control regulations of any country or territory from which those payments emanate.
+</p>
+
+<p>
+Label shall be entitled to create a ‘reserve’ against physical returns and anticipated Expenses.
+</p>
+
+<p><strong>9) RIGHTS PERIOD</strong><br>
+Label is granted an exclusive right of copyright and other rights in the Masters and all audio and audio-visual recordings and other materials created and/or delivered hereunder (“Materials”) throughout the Territory. Label hereby exclusively signs with full title guarantee all rights in and to the Materials (including without limitation all future copyright) to Label (excluding any copyright in the underlying compositions) throughout the Territory. Artist grants Label exclusive video rights in each Master delivered hereunder during the Rights Period.
+</p>
+
+<p>
+Label is free to exploit the Materials in any and all media and for any and all purposes as Label shall deem appropriate, including without limitation, through streaming, sync, compilation licences NFTs and any other kind of opportunities arising.
+</p>
+
+<p style="color: red;">
+All rights in the Compositions assigned to the Publisher under this Agreement shall automatically revert to the Writer upon the expiry of a period of eight (8) years from the date of first commercial release of the Work, provided that full recoupment of any advances and recoupable costs paid hereunder has occurred by such date (“Rights Period”).
+</p>
+
+<p style="color: red;">
+During the Rights Period, the Publisher shall not assign, transfer or otherwise dispose of its rights in the Compositions, in whole or in part, nor grant any licence or other rights of exploitation which extend beyond the Rights Period, without the prior written consent of the Writer.
+</p>
+
+<p style="color: red;">
+Any licence or agreement entered into by the Publisher in breach of the foregoing shall be null and void to the extent that it purports to grant rights beyond the Rights Period, and all rights shall in any event revert to the Writer free from any such encumbrances.
+</p>
+
+<p><strong>10) MECHANICALS</strong><br>
+Artist will ensure Label (and/or Label’s licensee(s)) is granted throughout the Territory and during the Rights Period:
+valid irrevocable mechanical licences for the Masters at 100% of statutory minimum rate in North America and the customary rate (in all other territories) in respect of all compositions embodied on Masters so as to enable Label and its licensees to fully use and exploit all Masters delivered hereunder as anticipated by this Agreement; gratis all-media synchronisation licence for promotional videos for Masters; and the right to reproduce without charge the lyrics of any compositions embodied on Masters in the packaging and artwork of records or audio visual devices released by Label or its licensees and to use free of charge up to thirty (30) seconds of any controlled composition in any format on Label’s and/or any of Label’s licensees’ websites.
+</p>
+
+<p><strong>11) APPROVALS</strong><br>
+Label will seek Artist's prior approval over:<br>
+-Third party synchs<br>
+-Remixes<br>
+-Premiums<br>
+-Exploitation of demos and outtakes<br>
+-Videos<br>
+-Samples<br>
+-Special or non-standard packaging
+</p>
+
+<p>
+Where Artist’s permission, consent or approval is required hereunder the same shall not be unreasonably withheld or delayed, shall not be withheld in order to obtain different or more favourable terms from Label and/or its licensees, and shall be deemed given by Artist in the event Artist does not reply to Label’s request for consent/approval with bona fide reasons for such refusal within three (3) days.  Approval shall not be required in connection with any usages under so called “blanket industry” agreements. For any approval required to be in writing email shall suffice. Label’s inadvertent failure to seek Artist’s approval shall not constitute a breach of this Agreement.
+</p>
+
+<p><strong>12) WARRANTIES/INDEMNITY</strong><br>
+Artist warrants, represents and undertakes:<br>
+Artist is entitled to enter into and perform this Agreement;<br>
+the Masters (and the underlying compositions) and any other materials delivered by Artist hereunder will not  infringe the rights of any third party;<br>
+Artist is a "qualifying person" under the Copyright Designs and Patents Act 1988 (“CDPA 1988”) and Artist’s execution of this Agreement will grant to Label all consents pursuant to Part II of the CDPA 1988 necessary to allow Label to fully exploit the Masters pursuant to the terms hereof;<br>
+Artist hereby undertakes to waive/ not to assert (as applicable) Artist’s moral rights hereunder and shall procure the same from all Third Party Contributors to the Masters (and the underlying compositions);<br>
+the payments to Artist by Label hereunder represent full equitable proper and adequate remuneration (whether as a single payment or otherwise) in respect of the rights granted hereunder;<br>
+Artist has been advised by Label to obtain advice from a solicitor with experience of the music industry as to the contents of this Agreement;<br>
+Artist shall be responsible for Artist’s own tax affairs and the administration thereof and under no circumstances shall Label be obliged to provide the same, suffer any loss or pay any costs in relation thereto;<br>
+Artist grants Label the right to use Artist’s name, professional name, likeness and biography in connection with the exploitation of the rights granted herein and all Label-required rights and consents shall be granted by Artist pursuant to the CDPA 1988 and otherwise;<br>
+during the Term and for a period of ten (10) years thereafter, Artist will not re-record any composition included on a Master delivered hereunder;<br>
+Artist has the exclusive right to use Artist’s pka name (if any) and Label’s use of the same shall not infringe the rights of any third party; and<br>
+save as otherwise provided hereunder, Artist shall be responsible for payments to and obtaining all necessary clearances, permissions and consents from all Third Party Contributors and shall deliver confirmation of the same to Label upon Label’s request.
+</p>
+
+<p>
+Artist agrees this agreement is cross recoupable across any other agreements Artist have with label.
+</p>
+
+<p>
+Artist shall indemnify and hold Label harmless against all and any loss, damages, liability and costs (including reasonable legal expenses) arising out of any third party claims that Label suffers or incurs as a result of, or in connection with, any breach by Artist of any terms of this Agreement.
+</p>
+
+<p><strong>13) THIRD PARTY CONTRIBUTOR</strong><br>
+Artist acknowledges that the Artist’s Royalty is inclusive of all royalties and fees payable to third parties contributing to the Masters delivered hereunder (“Third Party Contributor(s)”) including without limitation with respect to any producers, featured artists and mixers.
+</p>
+
+<p><strong>14) ACCOUNTING</strong><br>
+½ yearly PROVIDED THAT in respect of any such accounting period in which Artist’s Royalty is less than one hundred pounds (£100) Label shall not be obliged to render any accounting and shall be entitled to carry forward the payment of such amount to the next semi-annual accounting period. Label are entitled to ‘cross-recoup” should the Artist have any other releases with the label. Artist may audit Label’s books to the extent they relate to the exploitation of Masters such audit:
+</p>
+
+<p>
+(a) permitted once per calendar year upon not less than 30 days prior written notice;<br>
+(b) to take place at the place at which such books are stored;<br>
+statements will be deemed final and conclusive if not challenged within one (1) year of being rendered.
+</p>
+
+<p><strong>15) MISCELLANEOUS</strong><br>
+Within the Rights Period Label may licence or assign to any third party all or part of any rights, benefits and/or obligations under this agreement without fetter or inhibition and Label shall be entitled to exercise its rights hereunder via any third party. Artist shall not be entitled to assign this Agreement. This Agreement may be executed in one or more counterparts, each of which will be deemed an original but all of which together will constitute one and the same instrument. The parties agree that a photographic, PDF, electronic or facsimile copy of the signature evidencing a party’s execution of this Agreement will be effective as an original signature and may be used in lieu of the original for any purpose.
+</p>
+
+<p>
+No breach of this Agreement by either party shall be deemed material unless and until the party in breach has been served written notice requiring the same to be remedied and the party in breach has failed to remedy (where such breach is capable of remedy) such breach within thirty (30) days of receipt of such notice (or such other period as expressly provided for herein).  No breach of this Agreement shall be deemed material merely by the service of such notice or the expiry of the aforesaid period.
+</p>
+
+<p>
+Any termination of this Agreement and/or the Term shall be without prejudice to Label’s accrued rights and remedies prior to the date of such termination.
+</p>
+
+<p>
+This agreement contains all the terms agreed between you and us and replaces all previous agreements, arrangements and deal memos (written and oral) on the subject matter of this agreement and may not be varied except in writing signed by you and us. You confirm that no person acting or purporting to act on behalf of us has made any promises or representations which you have relied except those expressively set out in this agreement.
+</p>
+
+<p>
+If any side letters are required you hereby agree to sign these.
+</p>
+
+<p><strong>16) EXCLUSIVITY</strong><br>
+Artist agrees not to release or authorise the release of any Artist recordings during the Term. Artist shall use best endeavours to procure the taking down of any such competing releases.
+</p>
+
+<p><strong>17) JURISDICTION</strong><br>
+The agreement contained in this Agreement shall be governed by the Laws of England whose courts shall have exclusive jurisdiction.
+</p>
+
+<br><br>
+
+{{Company Signature Block}}
+
+<br><br>
+
+{{Artist Signature Blocks}}`;
+      const CGEN_SINGLE_SONG_TEMPLATE_NAME = 'Single Song Assignment';
+      const CGEN_SINGLE_SONG_TEMPLATE_TYPE = 'Publishing Agreement';
+      const CGEN_SINGLE_SONG_STATE_STORAGE_KEY = 'cgen_single_song_assignment_state_v1';
+      const CGEN_SINGLE_SONG_DEFAULT_CONSIDERATION = 'one pound (£1)';
+      const CGEN_SINGLE_SONG_TEMPLATE_BODY_HTML = `<p><strong>SONG ASSIGNMENT</strong></p>
+
+<p>
+THIS ASSIGNMENT is made the {{Date}} between
+</p>
+
+<p>
+{{Writers Block}}<br>
+(jointly and separately known as the “Writer”), of the one part;
+</p>
+
+<p>and</p>
+
+<p>
+Music Matters BYpittbull Ltd t/a Music Matters Songs, of 465 Hornsey Road, Unit 2, Office 10, London, N19 4DR, UK (the “Publisher”) of the other part.
+</p>
+
+<p>
+<strong>WITNESSETH THAT</strong> in consideration of the payment by the Publisher to the Writer of the sum of {{Consideration Amount}} (the receipt and sufficiency of which the Writer acknowledges) together with payment of the sums referred to below, the Writer hereby irrevocably and unconditionally assigns to the Publisher including by way of present assignment of present and future rights, title and interest with full title guarantee ALL the copyright throughout the World together with all other rights of a like nature as are now conferred by the laws in force in all other territories throughout the World and universe, including the renewal copyright as conferred by the law of the United States of America and such other rights as may hereafter be conferred or created by law or international arrangement or convention in any part of the World and universe whether by way of new or additional rights not now comprised in copyright or by way of extension of the period of then or now existing rights of and in the words and music to the extent such are controlled by the Writer as follows of the composition(s) entitled:-
+</p>
+
+<br>
+
+<p>
+{{Works Split Block}}
+</p>
+
+<br>
+
+<p>
+(hereinafter referred to as the “Work(s)”) and TO HOLD the same unto the Publisher, its successors and assigns absolutely in perpetuity and the Writer hereby agrees on demand to execute and sign any other documents and to do all other acts and things which may hereafter be required of the Writer for vesting in the Publisher the premises expressed to be hereby assigned and the Writer hereby warrants and declares that the Work is a new and original unpublished work and does not infringe the copyright in any other work and that the Writer has good right and full power to assign to the Publisher free from all encumbrances the premises expressed to be hereby assigned and every of them in the manner aforesaid
+</p>
+
+<p>
+Writer warrants and represents that it owns and/or controls the rights herein assigned in respect of the Compositions specified above. Writer also warrants that Publisher may use and may allow others to use Writer name, approved likeness and biographical material of the Writer for publication and exploitation of the Works referred to herein. In the event that any claim is made by a third party against Publisher (or any of its sub-territory affiliates) in respect of any of the Compositions Publisher shall thereupon serve written notice upon Writer containing details of such claim as known to Publisher and thereafter Writer agrees to indemnify Publisher against all such claims in full provided however that the Publisher shall not agree to settle any such claim by paying an amount in excess of £1,500 (one thousand, five hundred pounds) without the prior written consent of Writer and provided further that the Writer shall have the right at the Writer's expense to participate in the defence of any such claim, or at the Writer's election to conduct such defence on behalf of himself and Publisher.
+</p>
+
+<p>
+Publisher shall be exclusively and solely empowered to license, claim and make collections on all performance, mechanical, NFTs, other tech opportunities and all usages whatsoever and music publishing revenue accruing prior to and during the Term of this Agreement in respect of the Compositions in the Territory The World and The Universe.
+</p>
+
+<p><strong>Sheet Music Royalties</strong></p>
+
+<p>
+The Publisher shall have the right to include the said work in any printed edition, folio or newspaper and to license others to make similar use and shall pay seventy per cent (60%) of all sums received by the Publisher in respect of the inclusion thereof in all such printed editions, folios or newspapers.
+</p>
+
+<p><strong>Mechanical Royalties</strong></p>
+
+<p>
+Seventy percent (70%) of all royalties received by the Publisher for reproductions of the said work in connection with the manufacture of records, which shall include but not be limited to physical, digital downloads and streaming (other than for use in or in connection with cinematograph films and television films and any other third party synchronisation use) for sale to the public, and any other mechanical copy of the Compositions.
+</p>
+
+<p><strong>Synchronisation Fees</strong></p>
+
+<p>
+Fifty per cent (50%) of all royalties and fees received by the Publisher for the right to use the Work in or in connection with any cinematograph film or television programme and / or film, computer game or any other type of synchronisation usage.
+</p>
+
+<p><strong>NFTs and other Tech opportunities</strong></p>
+
+<p>
+Fifty per cent (50%) of all royalties and fees received by the Publisher for the right to use the Work in or in connection with any NFT or other tech opportunities.
+</p>
+
+<p><strong>Performing Broadcasting and Rediffusion Fees</strong></p>
+
+<p>
+All performing right fees collected by the PRS or its affiliated bodies or societies so long as the PRS or its affiliated bodies or societies is or are in a position so to do shall be paid as to fifty per cent (50%) directly to the Writer and fifty per cent (50%) directly to the Publisher subject to any allocation for orchestral arrangements or lyrics in accordance with the rules of the PRS or any affiliated society for the time being in force and in the event that either the Writer or the Publisher receives one hundred per cent (100%) of the performing rights fees collected by the PRS or its affiliated bodies or societies then the party receiving the same shall remit to the other of them its percentage share of the performing rights fees as aforesaid. The Writer and the Publisher shall execute all such directions to the PRS and/or its affiliated societies and other documents as may be necessary to procure such payments as aforesaid.
+</p>
+
+<p>
+Publisher shall collect the full “Publishers share” of performing income i.e. 6/12 (six twelfths) and Publisher shall remit 40% (forty per cent) to Writer after recoupment of advances hereunder.
+</p>
+
+<p>
+This Assignment may be regarded as the Writer’s certificate for the purpose of Paragraph (a) of the Performing Right Society's Rule 1(e) and Rule 2(f)(ii) authorising the Performing Right Society to treat the Publisher as exploiting the said works.
+</p>
+
+<p><strong>Prior Approval</strong></p>
+
+<p>
+Publisher shall obtain Owner’s prior written consent to for the following usage of any Composition:<br>
+i) First mechanical license other than for recordings which feature the Writer;<br>
+ii) Synchronisation licences granted in respect of advertisements, motion pictures and television usage (other than where such usage is pursuant to a blanket licensing scheme);<br>
+iii) Grand rights;<br>
+iv) Any material alteration or adaptation, and any so called “sample” usages;<br>
+v) Premiums and endorsements.
+</p>
+
+<p>
+The Writer’s consent hereunder my not be unreasonably withheld or delayed and shall be deemed granted unless withheld in writing (giving reasonable reasons therefore) within two (2) business days of it being requested by the Publisher by written notice. Such consent in respect of the Writer shall be sent by email to <span style="color: red;">{{Writer Approval Email}}</span> and such other email addresses as the writer shall notify Publisher in writing from time to time.
+</p>
+
+<p>
+Publisher shall at Owner’s request grant any license to Owner on terms as directed by Owner subject to the Publisher’s membership of any collection society and any such society rules.
+</p>
+
+<p><strong>Generally</strong></p>
+
+<p>
+All Royalties and Fees payable by the Publisher to the Writer shall be paid within 90 (ninety) days after June 30th and December 31st in each year.
+</p>
+
+<p>
+Writer has the right once a year to have his chartered or certified accountant audit all books, accounts and records of Publisher and/or the various sub-territory affiliates, as such books, accounts and records pertain to the administration of the Compositions at Writer's expense and Publisher shall ensure that Publisher and/or the various sub-territory affiliates co-operate fully with respect to such audit. Books, accounts and records of Publisher inspected during the course of any audit may not be re-inspected during the course of any subsequent audit. If an audit discloses a discrepancy in excess of 10% (ten per cent) or minimum £2,000 (two thousand) between monies due to Writer hereunder and monies accounted then Publisher shall remit the outstanding balance immediately and shall reimburse the Writer for all reasonable expenses, other than travel expenses, incurred with respect of such audit (up to a limit of £2,000)
+</p>
+
+<p>
+In order for the Writer to exercise the rights to termination predicated upon material failure or default, Writer shall first give Publisher notice of such alleged material failure or default whereon Publisher shall have a period of 45 (forty five) days to remedy such alleged failure or default, and in the event that Publisher fails to remedy any such material failure or default within such period Writer shall then have the right to terminate this Agreement by giving Publisher written notice thereof.
+</p>
+
+<p>
+<p style="color: red;">
+It is understood that your royalty will be cross recoupable across all copyrights, writing, agreements, masters and releases which you have undertaken with us.
+</p>
+
+<p>
+Writer confirms that they have obtained independent legal advice in regard to this Agreement.
+</p>
+
+<p>
+This Agreement contains the entire understanding of the parties hereto relating to the subject matters hereof and replaces and supersedes any prior written or oral agreement between the parties hereto with respect to the subject matter hereof and shall be governed by the Laws of England and the Supreme Court of Judicature.
+</p>
+
+<p>
+You shall not assign this Agreement. We shall be free to assign, sub-license or otherwise deal with the whole or any part of our rights under this agreement.
+</p>
+
+<p>
+AS WITNESS the hands of the parties hereto the day and year first above written.
+</p>
+
+<br><br>
+
+	{{Writer Signature Blocks}}
+
+	<br><br>
+
+	{{Publisher Signature Block}}`;
+
+      const CGEN_MMS_EXCLUSIVE_PUBLISHING_FIELDS = [
+        { key: 'Date', label: 'Date', inputType: 'date' },
+        { key: 'Writer Legal Name', label: 'Writer Legal Name', inputType: 'text' },
+        { key: 'Writer Address', label: 'Writer Address', inputType: 'textarea' },
+        { key: 'Initial Term Years', label: 'Initial Term Years', inputType: 'text' },
+        { key: 'Option Extension Months', label: 'Option Extension Months', inputType: 'text' },
+        { key: 'Advance Amount Number', label: 'Advance Amount Number', inputType: 'text' },
+        { key: 'Advance Amount Words', label: 'Advance Amount Words', inputType: 'text' },
+        { key: 'Writer Approval Email', label: 'Writer Approval Email', inputType: 'text' }
+      ];
+
+      const CGEN_MMS_EXCLUSIVE_PUBLISHING_DEFAULTS = {
+        'Initial Term Years': '3',
+        'Option Extension Months': '12',
+        'Advance Amount Number': '£1,000',
+        'Advance Amount Words': 'one thousand pounds'
+      };
+
+      const CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_BODY_HTML = `<p><strong>EXCLUSIVE PUBLISHING AGREEMENT</strong></p>
+
+<p>THIS AGREEMENT is made the {{Date}}</p>
+
+<p><strong>BETWEEN</strong></p>
+
+<p>
+(1) Music Matters BYpittbull Ltd t/a Music Matters Songs of 465 Hornsey Road, Unit 2, 1st Floor, Office 1,<br>
+London, N19 4DR ("Publisher");  and:
+</p>
+
+<p>
+(2) <strong>{{Writer Legal Name}}</strong>, of {{Writer Address}} (the "Writer").
+</p>
+
+<p><strong>1. BACKGROUND</strong></p>
+
+<p>The Writer has created and owns the copyright in pre-term Compositions</p>
+<p>The Writer and Publisher acknowledge that the Writer shall create future Compositions</p>
+<p>Writer has agreed to assign to the Publisher all copyright in the pre-term and future Compositions on the terms set out in this agreement.</p>
+
+<p><strong>2. DEFINITIONS</strong></p>
+
+<p>a. Compositions: The Writer’s Compositions shall mean all musical and/or literary works associated therewith and/or dramatico-musical works including the titles thereof which the Writer shall whether in whole or part:-</p>
+
+<p>
+i. have written heretofore including without limitation but not limited to the works which are listed in Schedule One of this Agreement; and,<br>
+ii. write during the Term; and,<br>
+iii. have commenced writing during the Term and which are completed within twelve (12) months after the Term determines.
+</p>
+
+<p>But the term ‘Compositions’ shall exclude always and at all times those compositions by the Writer that were delivered to Downtown Music Holdings under an agreement signed in May 2018. Unless they revert back to writer during the Term.</p>
+
+<p>b. Rights Period: shall be the Term plus life time of copyright from the end of the Term hereof.</p>
+
+<p>c. Net Receipts: all monies earned, credited and directly identifiable as being from exploitation of the Compositions received by or credited to the Publisher or its sub-publishers as appropriate, less only:</p>
+
+<p>
+i. taxes and VAT required to be and actually deducted;<br>
+ii. bona fide third party collection society charges;<br>
+iii. industry standard or mutually agreed sums payable by way of remuneration to arrangers, adaptors and translators of the Compositions;<br>
+iv. sums permitted to be retained by sub-publishers or licensees which may not exceed twenty per cent (20%), except in the case of covers and synchronisations for which the retention may be thirty (30%), of the sums arising directly and identifiably from the exploitation of the Compositions and the Publisher shall use best commercial endeavour to minimise such retentions.<br>
+v. any direct costs and expenses actually incurred and paid by Publisher or its sub-publishers and/or licensees in earning Net Receipts, including without limitation, the costs of manufacture and distribution of records, sheet music, songbooks and other graphic reproductions of Compositions, and payments to third party sync and licensing agents
+</p>
+
+<p>d. Territory: shall mean all countries of the World and the universe.</p>
+
+<p>e. Sound Recording: a sound recording of a Composition performed by the Writer.</p>
+
+<p>f. Covers: means any exploitation of a Composition which embodies the performance of a party other than the Writer (or any group of which Writer may be a featured member). In this agreement, Covers will be deemed to also include synchronisation for the purpose of calculating royalties.</p>
+
+<p><strong>3. TERM</strong></p>
+
+<p>a. The duration of this Agreement (the “Term”) shall be for {{Initial Term Years}} years ({{Initial Term Years}} years) commencing on the date hereof (the “Initial Period”).</p>
+
+<p>b. Writer hereby grants to Publisher the irrevocable and consecutive options to extend the Term for one (1) further period of {{Option Extension Months}} ({{Option Extension Months}}) months ("the Option Period"), should the paid advance(s) not be recouped. Such option to be exercisable by Publisher by written notice to Writer prior to the date when the Term would otherwise expire.</p>
+
+<p>c. If at the date when the current Period of the Term would otherwise expire (“End Date”) Publisher has neither exercised the option to extend the Term for a further Period even the paid advance is not recouped then the following provisions shall apply:</p>
+
+<p>
+i. Writer shall forthwith inform Publisher in writing that the option has not yet been exercised (an “Option Warning”);<br>
+ii. Publisher shall be entitled to exercise its option at any time before receiving the Option Warning or within ten (10) business days thereafter and in the event the Publisher exercises such option to extend the Term then the commencement date of the Option Period shall be back dated to the date such Period would have commenced had the Publisher exercised such option in a timely fashion without reliance on this clause;<br>
+iii. the current Period of the Term shall be deemed to have continued until Publisher exercise the option or Publisher shall give notice to Writer that Publisher do not wish to exercise the option or until the end of such period of ten (10) business days (whichever shall first occur) and if Publisher exercises the option within that period then the Option Period will be deemed to have started immediately after the date of lapse of the previous Period had it not been for the operation of this clause;
+</p>
+
+<p>d. During the Term Writer shall not write or compose, or furnish or dispose of, any musical Compositions, works or materials, or any rights or interests therein whatsoever, other than for and to Publisher.</p>
+
+<p><strong>4. MINIMUM COMMITMENT:</strong></p>
+
+<p>a. Intentionally deleted.</p>
+
+<p><strong>5. RIGHTS GRANTED:</strong></p>
+
+<p>For the consideration set out in this Agreement the Writer hereby assigns to the Publisher absolutely the following rights and licenses:</p>
+
+<p>a. The Writer hereby as beneficial owner and by way of present assignment of present and future copyright and all like rights, hereby assigns to the Publisher, its successors in title and assigns all the entire copyright in the Works as defined by the Copyright Designs and Patent Act 1988 (“CDPA”) and/or any subsequent United Kingdom amending legislation throughout the territories to which that Act and or any subsequent United Kingdom amending legislation may now or may at any time hereafter extend, including the property, title and interest vested and contingent and all other rights of a like nature as are now or may hereafter be conferred by the laws in force in the rest of the Territory including all renewals and extensions thereof and whether conferred by statute or otherwise and such other rights as may hereafter be conferred or created by law or international arrangement or convention in any part of the Territory whether by way of renewal or extension or the period of then or now existing rights for the protection of the copyright herein assigned TO HOLD the same unto the Publisher for the Assignment Term subject only to the grant of rights previously assigned by the Writer to the Performing Right Society Limited (“PRS”) by way of assignment of future copyright such rights to include the unlimited right to edit, copy, alter, add to, take from or adapt the product of the Writer’s services hereunder. The Writer hereby irrevocably waives the benefits of any provisions of law known as "Moral Rights" or any so called Droit Moral (including without limitation any rights of the Writer under section 77-85 inclusive of the CDPA or any other similar laws in force anywhere in the Territory.</p>
+
+<p>b. Publisher shall have the exclusive right to licence and make claim for any and all usages of the Compositions during the Term and Rights Period.</p>
+
+<p>c. The Writer hereby grants to the Publisher all consents which the Publisher may require under part 1 of the CDPA or any statutory modification or re-enactment thereof for the time being in force to enable it to make the fullest use of the Writer’s services and the proceeds thereof.</p>
+
+<p>d. The Publisher shall have the right to make available to third parties, via digital transmissions or physical means, copies of the Sound Recordings embodying the Compositions for the purposes of allowing third parties the opportunity to preview and audition the Compositions;</p>
+
+<p>e. The Publisher shall have the right to broadcast or rebroadcast the Compositions by means of radio and/or television and by any other means whatsoever, including broadcasts transmitted from transmitters situated in the Territory wherever the same may be received, and to transmit the Compositions to subscribers to a diffusion service by any means whatsoever, whether with or without visual images, and to exploit the same subject always to the terms of any blanket industry agreements from time to time in force in the Territory insofar as applicable;</p>
+
+<p>f. The Publisher shall have the exclusive right to grant worldwide perpetual or limited licences in respect of any audio visual production originating in the Territory to third parties to reproduce and exploit the Compositions by means of synchronisation with any cinematograph film, advertisement, television film or production, videocassette or disc or any other visual image producing device now known including but not limited to streaming, video on demand, or which becomes known after the date of this Agreement known subject always to the terms of any blanket industry agreements from time to time in force in the Territory;</p>
+
+<p>g. a non-exclusive, irrevocable, royalty-free, licence for the Term period to use the Sound Recordings throughout the Territory and such use and exploitation shall not be monetised and be limited to:</p>
+
+<p>
+i. the right, where such right is available to the Writer, to reproduce the Sound Recordings by means of mechanical and/or digital reproduction by way of record or other sound bearing contrivance and/or visual image producing contrivance (including, but without limitation all of videograms and CD Roms or other digital or electronic formats) or other device now known or to become known after the date of this Agreement solely for PROMOTIONAL purposes;<br>
+ii. the rights to copy and edit the Sound Recordings solely for PROMOTIONAL purposes;<br>
+iii. the right to stream the Sound Recordings on our website or a website owned or controlled by us or any third party website of our choosing solely for PROMOTIONAL purposes.
+</p>
+
+<p>h. Writer acknowledges that subject always to clause 6 (b) Publisher has the right to substitute a new title or titles for the Compositions and to make any arrangements, adaptations, translation, dramatisation or transposition of the Compositions in whole or in part, and in connection with any other musical, literary or dramatic material, and to add new lyrics to the music of the Compositions or new music to the lyrics of the Compositions. Writer’s royalties hereunder for any such Composition shall be reduced in such a manner as to reflect the contribution of any new contributor to the Compositions, but no instance may Writer’s royalties be reduced by more than one-half (1/2)</p>
+
+<p>i. The Writer further grants to the Publisher the right to collect any and all royalties or fees in respect of the Works which may have accrued prior to the Term in respect of Compositions but which have not been paid to the Writer.</p>
+
+<p><strong>6. OBLIGATIONS OF PUBLISHER</strong></p>
+
+<p>a. The Publisher shall use its reasonable endeavours to exploit the Compositions, during the Term by either:</p>
+
+<p>
+i. issuing a licence for making a recording of the Compositions for the purpose of reproducing the same on a record or other sound bearing contrivance, digital download and/or visual image producing contrivance or device for sale to the public; or<br>
+ii. licensing the publication of the Compositions in printed form for sale to the public, including the preparation and editing of the work for use in a hire library; or<br>
+iii. issuing the grant of a licence for the synchronisation of the Compositions with any advertisement, jingle, film, television, video cassette, computer game mobile phone operative or disc or any other visual producing device or streaming service; or<br>
+iv. issuing a licence for a public performance of the Compositions either directly or via a blanket licence, including but not limited to a transmission on radio, television, internet or similar computer network; or<br>
+v. obtaining a Cover of the Compositions.<br>
+vi. protecting the copyright and all like right in and to the Compositions during the Retention Period
+</p>
+
+<p>and in the event that no such exploitation has occurred then you shall be entitled to give notice in writing to us at any time after the date of the expiry of Term specifying the Compositions which have not been so exploited.</p>
+
+<p>If none of the uses referred to in paragraphs 6 (a) has in fact taken place prior to receipt of such notice and does not take place in respect of such Composition within a further period of 3 (three) months from the date of receipt of such notice by the publisher, then with effect from the expiration of such 3 (three) month period the publisher shall reassign to Writer all rights hereby assigned to us in respect of such composition, and upon such reassignment shall have no further claim whatsoever against us in respect of the non-exploitation of such work.</p>
+
+<p>b. The Publisher shall obtain the Writer’s prior written consent to for the following usage:</p>
+
+<p>
+i. first mechanical license of any Work other than for recordings which feature the Writer;<br>
+ii. synchronisation licences for any Work granted in respect of advertisements, motion pictures and television usage (other than where such usage is pursuant to a blanket licensing scheme);<br>
+iii. grand rights for any Work;<br>
+iv. any material alteration or adaptation, and any so called “sample” usages of any Work;<br>
+v. premiums and endorsements in respect of any Work;<br>
+vi. tablature of any Work; and<br>
+vii. photographs, likeness and biography of the Writer.
+</p>
+
+<p>c. The Writer’s consent hereunder may not be unreasonably withheld or delayed and shall be deemed granted unless withheld in writing (giving reasonable reasons therefore) within three (3) business days of it being requested by the Publisher by written notice. Such consent in respect of the Writer shall be sent by email to <span style="color: red;">{{Writer Approval Email}}</span></p>
+
+<p>d. The Publisher shall effectively and diligently (a) register the Compositions with the relevant societies and (b) collect income arising from the exploitation of the Compositions</p>
+
+<p><strong>7. OBLIGATIONS OF THE WRITER:</strong></p>
+
+<p>a. Writer agrees to perform the services required hereunder conscientiously and solely and exclusively for and as requested by Publisher. Writer shall promptly and faithfully comply with all reasonable requirements and requests by Publisher in connection with its business as set forth herein.</p>
+
+<p>b. Writer agrees to execute or sign any other document and do all other acts and things that may be reasonably required to vest in the Publisher the rights granted hereunder.</p>
+
+<p><strong>8. ADVANCE PAYMENTS:</strong></p>
+
+<p>a. The Publisher shall pay to the Writer the following sums as advances recoupable against all sums (other than advances) payable by the Publisher to the Writer hereunder:-</p>
+
+<p>(i) in respect of the Initial Period the Publisher shall pay to the Writer the sum of {{Advance Amount Number}} ({{Advance Amount Words}}) plus VAT within 7 (seven) days of signature hereof by both parties, subject to the receipt by the Publisher from the Writer of a valid invoice.</p>
+
+<p>All the advances paid by the Publisher to the Writer shall be aggregated after payment and the Publisher shall be entitled to treat each sum as and when paid as an advance chargeable against all royalties and fees becoming due after payment of such sum to the Writer by reason of this Agreement and any advance or advances not recovered out of fees and royalties in the accounting period in which the advance is made shall be carried forward and recovered out of fees and royalties payable in the subsequent accounting periods during the Assignment Term until the whole of the advance or advances has been recovered but not to be deducted from further advances paid or payable hereunder.</p>
+
+<p>Music Matters BYpittbull Ltd confirms that it shall not take any management commission on the proceeds of this agreement.</p>
+
+<p>(b) The Publisher shall not be obligated to pay any royalties or fees due to the Writer under this Agreement unless and until all outstanding advances hereunder shall have been recouped by the Publisher but the Publisher shall in any event send to the Writer the accounting statements provided for in Clause 11(a) below</p>
+
+<p><strong>9. ROYALTIES</strong></p>
+
+<p>a. These shall be payable to the Writer on a Net Receipts basis and the Publisher agrees to pay to the Writer (subject to recoupment of the advances and other recoupable payments) the following royalties:</p>
+
+<p>
+i. Sheet Music Royalties: seventy percent (70%) of Net Receipts<br>
+ii. Mechanical Royalties: seventy percent (70%) of Net Receipts<br>
+iii. Covers procured by the Publisher: sixty percent (60%) of Net Receipts<br>
+iv. Synchronisation Fees: sixty per cent (60%) of any and all sums actually received by Publisher on a Net Receipts basis from motion picture, computer game, television, synchronisation and any other third party synchronisation<br>
+v. Broadcast/Performance Income: forty per cent (40%) of the "publisher's share" of all performing fees received by the Publisher from the broadcast/public performance of the Compositions.<br>
+vi. Foreign Income: seventy percent (70%) of any all Net Receipts, after the deductions set out in 2 (c ).<br>
+vii. Other Income: seventy percent (70%) of Net Receipts from any other source being directly identifiable as from usage(s) of the Compositions and not otherwise specifically referred to in this Agreement.
+</p>
+
+<p><strong>10. ACCOUNTING</strong></p>
+
+<p>a. The Publisher shall account to Writer in respect of each accounting period as at 30th June and 31st December in each year and shall show all monies received by the Publisher. Such statements shall be mailed within ninety (90) days after the end of each accounting period together with a remittance by the Publisher to the Writer of all sums thereby shown to be due, provided that the aggregate of such sums exceeds (with balances carried forward from previous periods) the sum of £250.</p>
+
+<p>b. Not more than once in each year and subject to giving Publisher thirty (30) days prior written notice, the Publisher shall at the request of the Writer allow the permitted auditors to examine the relevant parts of all royalty accounts and statements only in so far as the same relate to the Compositions hereunder.</p>
+
+<p>c. In the event that the permitted auditors as aforesaid carry out such an examination Writer shall provide Publisher not less than thirty (30) days prior to such examination with a full list of the titles and writers of all Compositions in respect of which the examination is to be conducted. The Writer acknowledges that the documents made available for examination contain confidential commercial information and neither the Writer nor the permitted auditors shall disclose (other than to Writer's professional advisors) or use on behalf of any third party any facts or information obtained as a result of any such inspection. After completion of the examination the Writer shall provide the Publisher with a full copy of all reports in relation to any claim resulting therefrom and the Publisher will make good any shortfall in accounting forthwith.</p>
+
+<p>d. No examination shall be conducted in respect of accounting periods commencing more than three (3) years prior to the date of receipt by the Publisher of a request to conduct the same, or shall be conducted in respect of accounting periods which shall have been the subject of a previous audit hereunder. Any royalty statement or payment submitted by the Publisher to the Writer and unchallenged by the Writer within three (3) years from the date of issue thereof shall be deemed conclusively settled and binding on the Writer unless a notice to audit such account has already been received by the Publisher.</p>
+
+<p>e. In the event that any audit reveals an underpayment in excess of ten percent (10%) or two thousand pounds (£2,000) the Publisher shall reimburse to the Writer the cost of such audit up to GBP £2,000,-</p>
+
+<p><strong>11. MORAL RIGHTS</strong></p>
+
+<p>a. The Writer, being the sole author of the Compositions, waives against publisher and its licensees her moral rights arising under the Copyright, Designs and Patents Act 1988 and, so far as is legally possible, any broadly equivalent rights she may have in any territory of the world.</p>
+
+<p><strong>12. WARRANTIES:</strong></p>
+
+<p>The Writer represents and confirms that:</p>
+
+<p>
+a. Compositions written or to be written or produced hereunder shall be original and written in good faith and the exploitation of the rights assigned by this agreement will not infringe the rights of any third party;<br>
+b. The Writer is fully entitled to enter and perform under this Agreement.<br>
+c. The Writer shall promptly and accurately inform Publisher of all the titles of Compositions to be recorded and produced within the Term and options of this Agreement, the Writer’s interest therein and names and interest of co-writer(s) (if any).<br>
+d. Writer indemnify Publisher, its successors and assigns against all cost, damages, losses and expenses (including legal expenses) suffered by Publisher as a result of any breach by Writer of the warranties and declarations on you Writer’s part contained herein as are provided by final order or award of a court or settled with Writer’s consent.
+</p>
+
+<p><strong>13. COLLABORATIONS</strong></p>
+
+<p>INTENTIONALLY DELETED</p>
+
+<p><strong>14. ASSIGNMENT</strong></p>
+
+<p>a. The Publisher shall be entitled to assign this Agreement and its benefits and burdens to any Company. No such assignment shall relieve the Publisher of any of its obligation hereunder and as a condition of such assignment being effective Publisher shall procure that the Publisher shall enter into a direct covenant with the Writer to comply with all of the terms and conditions of this Agreement.</p>
+
+<p>All monies payable to the Writer shall be paid to Moojie Limited and receipt of funds by Moojie Limited shall be deemed valid receipt by the Writer</p>
+
+<p><strong>15. JURISDICTION</strong></p>
+
+<p>
+a. This Agreement shall be subject to the laws of England and Wales and the parties agree to submit disputes to the jurisdiction of the High Court of England.<br>
+b. Arbitration and Mediation shall be also considered by both parties as alternative methods of dispute resolution should it be deemed appropriate according to the circumstances and agreed by both parties.<br>
+c. This document contains an important agreement which will affect the writers career. Before signing writer should be sure that writer understands its contents and that writer wishes to be bound by it. Publisher further recommend writer taking legal advice from and independent expert.
+</p>
+
+<p><strong>16. TERMINATION BY WRITER</strong></p>
+
+<p>
+a. In order for the Writer to exercise the rights to termination predicated upon material failure or default, Writer shall first give Publisher notice of such alleged material failure or default whereon Publisher shall have a period of 45 (forty five) days to remedy such alleged failure or default, and in the event that Publisher fails to remedy any such material failure or default within such period Writer shall then have the right to terminate this Agreement by giving Publisher written notice thereof<br>
+b. The Writer shall be entitled to terminate this agreement in the event that the Publisher enters into insolvent liquidation or if the publisher permanently ceases to trade.
+</p>
+
+<p><strong>17. TERMINATION BY PUBLISHER</strong></p>
+
+<p>
+c. If Writer (being a natural person) enter into bankruptcy or if Writer (being a body corporate) make any composition of Writer’s creditors or if a trustee in bankruptcy is appointed to take over all or a substantial part of Writer’s assets and undertaking, Publisher shall have the option to terminate this Agreement immediately upon giving notice of such termination to Writer.<br>
+d. If Writer is in fundamental breach of the provisions of this Agreement to be performed and such default shall continue for a period of 30 (thirty) days after the receipt by Publisher of notice from Publisher alleging such default, then Publisher shall have the right at any time following Writer’s receipt of such notice to terminate this Agreement immediately upon giving notice of such termination to Writer, SUBJECT TO PAYMENT OF ROYALTIES TO WRITER.<br>
+e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be without prejudice to Publisher rights under this Agreement in respect of each and all of the Compositions to which Publisher were entitled pursuant to this Agreement at the date of such termination.
+</p>
+
+<br><br>
+
+<p>Publisher and Writer hereby execute this Agreement by counter-parts with the signatures, date and identification details below:</p>
+
+<br><br>
+
+<p><strong>PUBLISHER</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>WRITER</strong></p>
+
+<br><br>
+
+<p>For and on behalf of the Publisher:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For and on behalf of the Writer:</p>
+
+<br><br>
+
+<p>Signature: _____________________________________&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Signature: ___________________________________</p>
+
+<p><strong>Music Matters BYpittbull Ltd t/a Music Matters Songs</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>{{Writer Legal Name}}</strong></p>`;
+      const CGEN_ULU_STANDARD_FIELDS = [
+        { key: 'Artist PKA', label: 'Artist PKA', inputType: 'text' },
+        { key: 'Agreement Date', label: 'Agreement Date', inputType: 'date' },
+        { key: 'Recipient Name', label: 'Recipient Name', inputType: 'text' },
+        { key: 'Track Title', label: 'Track Title', inputType: 'text' },
+        { key: 'Original Artists', label: 'Original Artists', inputType: 'text' },
+        { key: 'Advance Amount', label: 'Advance Amount', inputType: 'text' },
+        { key: 'Advance Amount Words', label: 'Advance Amount Words', inputType: 'text' },
+        { key: 'Bonus 1 Amount', label: 'Bonus 1 Amount', inputType: 'text' },
+        { key: 'Bonus 1 Amount Words', label: 'Bonus 1 Amount Words', inputType: 'text' },
+        { key: 'Bonus 1 Trigger', label: 'Bonus 1 Trigger', inputType: 'text' },
+        { key: 'Credit Format', label: 'Credit Format', inputType: 'text' }
+      ];
+      const CGEN_ULU_DYNAMIC_PLACEHOLDERS = ['Remixers Block', 'Remixer Signature Blocks'];
+      const CGEN_ULU_MASTER_FIELDS = [
+        { key: 'Date', label: 'Date', inputType: 'date' },
+        { key: 'Options Text', label: 'Options Text', inputType: 'textarea' },
+        { key: 'Advance Amount Words', label: 'Advance Amount Words', inputType: 'text' },
+        { key: 'Advance Amount Number', label: 'Advance Amount Number', inputType: 'text' }
+      ];
+      const CGEN_SINGLE_SONG_FIELDS = [
+        { key: 'Date', label: 'Date', inputType: 'date' },
+        { key: 'Consideration Amount', label: 'Consideration Amount', inputType: 'text' },
+        { key: 'Writer Approval Email', label: 'Writer Approval Email', inputType: 'text' }
+      ];
 
       function get(id) { return document.getElementById(id); }
 
+      function cgenIsUluRemixTemplate(tpl) {
+        return !!(tpl && String(tpl.name || '').trim() === CGEN_ULU_TEMPLATE_NAME);
+      }
+
+      function cgenIsUluMasterAgreementTemplate(tpl) {
+        return !!(tpl && String(tpl.name || '').trim() === CGEN_ULU_MASTER_TEMPLATE_NAME);
+      }
+
+      function cgenIsSingleSongAssignmentTemplate(tpl) {
+        return !!(tpl && String(tpl.name || '').trim() === CGEN_SINGLE_SONG_TEMPLATE_NAME);
+      }
+
+      function cgenIsMmsExclusivePublishingTemplate(tpl) {
+        return !!(tpl && String(tpl.name || '').trim() === CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_NAME);
+      }
+
+      function cgenMakeRemixerRow(name, address) {
+        return {
+          name: String(name || ''),
+          address: String(address || '')
+        };
+      }
+
+      function cgenMakeUluMasterArtistRow(legalName, pkaName, address) {
+        return {
+          legalName: String(legalName || ''),
+          pkaName: String(pkaName || ''),
+          address: String(address || '')
+        };
+      }
+
+      function cgenMakeUluMasterMasterRow(countWords, countNumber, title) {
+        return {
+          countWords: String(countWords || ''),
+          countNumber: String(countNumber || ''),
+          title: String(title || '')
+        };
+      }
+
+      function cgenMakeSingleSongWriterRow(legalName, pkaName, address, workTitle, ownershipPct) {
+        return {
+          legalName: String(legalName || ''),
+          pkaName: String(pkaName || ''),
+          address: String(address || ''),
+          workTitle: String(workTitle || ''),
+          ownershipPct: String(ownershipPct || '')
+        };
+      }
+
+      function cgenNormalizeSingleSongWriters(rows) {
+        if (!Array.isArray(rows)) return [];
+        return rows.slice(0, 12).map(function(r) {
+          return cgenMakeSingleSongWriterRow(r && r.legalName, r && r.pkaName, r && r.address, r && r.workTitle, r && r.ownershipPct);
+        });
+      }
+
+      function cgenReadSingleSongStateStore() {
+        try {
+          const raw = localStorage.getItem(CGEN_SINGLE_SONG_STATE_STORAGE_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function cgenWriteSingleSongStateStore(next) {
+        try {
+          localStorage.setItem(CGEN_SINGLE_SONG_STATE_STORAGE_KEY, JSON.stringify(next || {}));
+        } catch (e) {}
+      }
+
+      function cgenLoadSingleSongState(tpl) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return { fields: {}, writers: [] };
+        const store = cgenReadSingleSongStateStore();
+        const entry = store[key] && typeof store[key] === 'object' ? store[key] : {};
+        return {
+          fields: entry.fields && typeof entry.fields === 'object' ? entry.fields : {},
+          writers: cgenNormalizeSingleSongWriters(entry.writers)
+        };
+      }
+
+      function cgenPersistSingleSongState(tpl, state) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return;
+        const store = cgenReadSingleSongStateStore();
+        store[key] = {
+          fields: state && state.fields && typeof state.fields === 'object' ? state.fields : {},
+          writers: cgenNormalizeSingleSongWriters(state && state.writers)
+        };
+        cgenWriteSingleSongStateStore(store);
+      }
+
+      function cgenSingleSongWriterDisplayName(writer) {
+        const legal = String((writer && writer.legalName) || '').trim();
+        const pka = String((writer && writer.pkaName) || '').trim();
+        if (!legal && !pka) return '[Writer]';
+        if (legal && pka) return legal + ' (pka ' + pka + ')';
+        return legal || pka;
+      }
+
+      function cgenBuildSingleSongWritersBlock(writers) {
+        const rows = (writers || []).filter(function(w) {
+          return String((w && w.legalName) || '').trim() || String((w && w.pkaName) || '').trim() || String((w && w.address) || '').trim();
+        });
+        return rows.map(function(w) {
+          const name = cgenSingleSongWriterDisplayName(w);
+          const addressHtml = cgenEscapeHtml(String((w && w.address) || '[Address]')).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '<br>');
+          return '<strong>' + cgenEscapeHtml(name) + ', who\u2019s registered at ' + addressHtml + '</strong>';
+        }).join(' and ');
+      }
+
+      function cgenBuildSingleSongWorksSplitBlock(writers) {
+        const rows = (writers || []).filter(function(w) {
+          return String((w && w.legalName) || '').trim() || String((w && w.pkaName) || '').trim() || String((w && w.address) || '').trim();
+        });
+        return rows.map(function(w) {
+          const legal = String((w && w.legalName) || '').trim() || '[Legal Name]';
+          const workTitle = String((w && w.workTitle) || '').trim() || '[Work Title]';
+          const pct = String((w && w.ownershipPct) || '').trim() || '[Ownership %]';
+          return '<strong>' + cgenEscapeHtml(legal) + '</strong> \u2013 ' + cgenEscapeHtml(workTitle) + ' \u2013 ' + cgenEscapeHtml(pct);
+        }).join('<br>');
+      }
+
+      function cgenBuildSingleSongWriterSignatureBlocks(writers) {
+        const rows = (writers || []).filter(function(w) {
+          return String((w && w.legalName) || '').trim() || String((w && w.pkaName) || '').trim() || String((w && w.address) || '').trim();
+        });
+        return rows.map(function(w) {
+          const name = cgenSingleSongWriterDisplayName(w);
+          return '<p>SIGNED by</p><p><strong>' + cgenEscapeHtml(name) + '</strong></p><br><br><p>________________________</p><p>Dated:</p>';
+        }).join('<br><br>');
+      }
+
+      function cgenBuildSingleSongPublisherSignatureBlock() {
+        return '<p>SIGNED</p><p>FOR and on behalf of:</p><p><strong>Music Matters BYpittbull Ltd t/a Music Matters Songs</strong></p><br><br><p>________________________</p><p>Dated:</p>';
+      }
+
+      function cgenReadUluMasterStateStore() {
+        try {
+          const raw = localStorage.getItem(CGEN_ULU_MASTER_STATE_STORAGE_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function cgenWriteUluMasterStateStore(next) {
+        try {
+          localStorage.setItem(CGEN_ULU_MASTER_STATE_STORAGE_KEY, JSON.stringify(next || {}));
+        } catch (e) {}
+      }
+
+      function cgenNormalizeUluMasterArtists(rows) {
+        if (!Array.isArray(rows)) return [];
+        return rows.slice(0, 12).map(function(r) {
+          return cgenMakeUluMasterArtistRow(r && r.legalName, r && r.pkaName, r && r.address);
+        });
+      }
+
+      function cgenNormalizeUluMasterMasters(rows) {
+        if (!Array.isArray(rows)) return [];
+        return rows.slice(0, 30).map(function(r) {
+          return cgenMakeUluMasterMasterRow(r && r.countWords, r && r.countNumber, r && r.title);
+        });
+      }
+
+      function cgenLoadUluMasterState(tpl) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return { fields: {}, artists: [], masters: [] };
+        const store = cgenReadUluMasterStateStore();
+        const entry = store[key] && typeof store[key] === 'object' ? store[key] : {};
+        return {
+          fields: entry.fields && typeof entry.fields === 'object' ? entry.fields : {},
+          artists: cgenNormalizeUluMasterArtists(entry.artists),
+          masters: cgenNormalizeUluMasterMasters(entry.masters)
+        };
+      }
+
+      function cgenPersistUluMasterState(tpl, state) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return;
+        const store = cgenReadUluMasterStateStore();
+        store[key] = {
+          fields: state && state.fields && typeof state.fields === 'object' ? state.fields : {},
+          artists: cgenNormalizeUluMasterArtists(state && state.artists),
+          masters: cgenNormalizeUluMasterMasters(state && state.masters)
+        };
+        cgenWriteUluMasterStateStore(store);
+      }
+
+      function cgenBuildUluMasterArtistsBlock(artists) {
+        const rows = (artists || []).filter(function(a) {
+          return String((a && a.legalName) || '').trim() || String((a && a.pkaName) || '').trim() || String((a && a.address) || '').trim();
+        });
+        return rows.map(function(a) {
+          const legal = String(a.legalName || '[Legal Name]').trim();
+          const pka = String(a.pkaName || '').trim();
+          const addressHtml = cgenEscapeHtml(String(a.address || '[Address]')).replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '<br>');
+          const namePart = pka ? (cgenEscapeHtml(legal) + ' (pka ' + cgenEscapeHtml(pka) + ')') : cgenEscapeHtml(legal);
+          return '<strong>' + namePart + '</strong>, who\u2019s registered at <strong>' + addressHtml + '</strong>';
+        }).join(' and ');
+      }
+
+      function cgenBuildUluMasterMastersBlock(masters) {
+        const rows = (masters || []).filter(function(m) {
+          return String((m && m.countWords) || '').trim() || String((m && m.countNumber) || '').trim() || String((m && m.title) || '').trim();
+        });
+        return rows.map(function(m) {
+          const cw = cgenEscapeHtml(String(m.countWords || '[Master Count Words]'));
+          const cn = cgenEscapeHtml(String(m.countNumber || '[Master Count Number]'));
+          const title = cgenEscapeHtml(String(m.title || '[Master Title]'));
+          return '<p style="margin-left: 36px; margin-top: 0; margin-bottom: 0;">' +
+            cw + ' (' + cn + ') master entitled:<br>' +
+            '\u201c' + title + '\u201d' +
+          '</p>';
+        }).join('<br><br>');
+      }
+
+      function cgenNormalizeUluMasterMastersContainer(body) {
+        let next = String(body || '');
+        // Ensure Masters Block is not wrapped in an extra <p> (since each master renders as its own <p>).
+        next = next.replace(/<p[^>]*>\s*\{\{\s*Masters Block\s*\}\}\s*<\/p>/i, '{{Masters Block}}');
+        return next;
+      }
+
+      function cgenUluMasterArtistDisplayName(a) {
+        const legal = String((a && a.legalName) || '').trim();
+        const pka = String((a && a.pkaName) || '').trim();
+        if (!legal && !pka) return '[Artist]';
+        if (legal && pka) return legal + ' (pka ' + pka + ')';
+        return legal || pka;
+      }
+
+      function cgenBuildUluMasterCompanySignatureBlock() {
+        return '<p>Date, Read and Agreed:</p><br><br><p>For and on behalf of</p><p><strong>Music Matters BYpittbull Ltd</strong></p>';
+      }
+
+      function cgenBuildUluMasterArtistSignatureBlocks(artists) {
+        const rows = (artists || []).filter(function(a) {
+          return String((a && a.legalName) || '').trim() || String((a && a.pkaName) || '').trim() || String((a && a.address) || '').trim();
+        });
+        return rows.map(function(a) {
+          return '<p>Date, Read and Agreed:</p><br><br><p>For and on behalf of</p><p><strong>' + cgenEscapeHtml(cgenUluMasterArtistDisplayName(a)) + '</strong></p>';
+        }).join('<br><br>');
+      }
+
+      function cgenReadRemixersStore() {
+        try {
+          const raw = localStorage.getItem(CGEN_REMIXERS_STORAGE_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function cgenWriteRemixersStore(next) {
+        try {
+          localStorage.setItem(CGEN_REMIXERS_STORAGE_KEY, JSON.stringify(next || {}));
+        } catch (e) {}
+      }
+
+      function cgenRemixersKeyForTemplate(tpl) {
+        if (!tpl) return '';
+        const id = String(tpl.id || '').trim();
+        if (id) return 'id:' + id;
+        const name = String(tpl.name || '').trim();
+        return name ? ('name:' + name) : '';
+      }
+
+      function cgenNormalizeRemixerRows(rows) {
+        if (!Array.isArray(rows)) return [];
+        return rows
+          .slice(0, 12)
+          .map(function(r) {
+            return cgenMakeRemixerRow(r && r.name, r && r.address);
+          });
+      }
+
+      function cgenLoadRemixersForTemplate(tpl) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return [];
+        const store = cgenReadRemixersStore();
+        return cgenNormalizeRemixerRows(store[key]);
+      }
+
+      function cgenPersistRemixersForTemplate(tpl) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return;
+        const store = cgenReadRemixersStore();
+        store[key] = cgenNormalizeRemixerRows(cgenRemixerRows);
+        cgenWriteRemixersStore(store);
+      }
+
+      function cgenPersistCurrentRemixers() {
+        const tpl = cgenGetSelectedTemplate();
+        if (!cgenIsUluRemixTemplate(tpl)) return;
+        cgenPersistRemixersForTemplate(tpl);
+      }
+
+      function cgenReadUluRemixStateStore() {
+        try {
+          const raw = localStorage.getItem(CGEN_ULU_REMIX_STATE_STORAGE_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function cgenWriteUluRemixStateStore(next) {
+        try {
+          localStorage.setItem(CGEN_ULU_REMIX_STATE_STORAGE_KEY, JSON.stringify(next || {}));
+        } catch (e) {}
+      }
+
+      function cgenLoadUluRemixFieldValues(tpl) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return {};
+        const store = cgenReadUluRemixStateStore();
+        const entry = store[key] && typeof store[key] === 'object' ? store[key] : {};
+        const fields = entry.fields && typeof entry.fields === 'object' ? entry.fields : {};
+        return fields;
+      }
+
+      function cgenPersistUluRemixFieldValue(tpl, fieldKey, value) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return;
+        const normalizedKey = String(fieldKey || '').trim();
+        if (!normalizedKey) return;
+        const store = cgenReadUluRemixStateStore();
+        const entry = store[key] && typeof store[key] === 'object' ? store[key] : {};
+        const fields = entry.fields && typeof entry.fields === 'object' ? entry.fields : {};
+        fields[normalizedKey] = String(value == null ? '' : value);
+        store[key] = Object.assign({}, entry, { fields: fields });
+        cgenWriteUluRemixStateStore(store);
+      }
+
+      function cgenReadMmsExclusivePublishingStateStore() {
+        try {
+          const raw = localStorage.getItem(CGEN_MMS_EXCLUSIVE_PUBLISHING_STATE_STORAGE_KEY);
+          if (!raw) return {};
+          const parsed = JSON.parse(raw);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function cgenWriteMmsExclusivePublishingStateStore(next) {
+        try {
+          localStorage.setItem(CGEN_MMS_EXCLUSIVE_PUBLISHING_STATE_STORAGE_KEY, JSON.stringify(next || {}));
+        } catch (e) {}
+      }
+
+      function cgenLoadMmsExclusivePublishingFieldValues(tpl) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return {};
+        const store = cgenReadMmsExclusivePublishingStateStore();
+        const entry = store[key] && typeof store[key] === 'object' ? store[key] : {};
+        return entry && typeof entry === 'object' ? entry : {};
+      }
+
+      function cgenPersistMmsExclusivePublishingFieldValue(tpl, fieldKey, value) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (!key) return;
+        const normalizedKey = String(fieldKey || '').trim();
+        if (!normalizedKey) return;
+        const store = cgenReadMmsExclusivePublishingStateStore();
+        const entry = store[key] && typeof store[key] === 'object' ? store[key] : {};
+        entry[normalizedKey] = String(value == null ? '' : value);
+        store[key] = entry;
+        cgenWriteMmsExclusivePublishingStateStore(store);
+      }
+
+      function cgenReplaceAllPlaceholderForms(body, key, replacement) {
+        const value = String(replacement == null ? '' : replacement);
+        const curly = new RegExp('\\{\\{\\s*' + cgenEscapeRegex(key) + '\\s*\\}\\}', 'g');
+        const square = new RegExp('\\[\\s*' + cgenEscapeRegex(key) + '\\s*\\]', 'g');
+        return String(body || '').replace(curly, value).replace(square, value);
+      }
+
+      function cgenApplyUluApprovedClauses(body) {
+        let updatedBody = String(body || '');
+        updatedBody = cgenReplaceAllPlaceholderForms(updatedBody, 'Exclusivity Window', cgenEscapeHtml(CGEN_ULU_EXCLUSIVITY_CLAUSE));
+        updatedBody = cgenReplaceAllPlaceholderForms(updatedBody, 'Advance Payment Terms', cgenEscapeHtml(CGEN_ULU_ADVANCE_PAYMENT_CLAUSE));
+        updatedBody = updatedBody.replace(/<p>\s*<strong>\s*3\.\s*ADVANCES\s*<\/strong>\s*<\/p>\s*<p>[\s\S]*?<\/p>/i, CGEN_ULU_ADVANCE_CLAUSE_HTML);
+        updatedBody = updatedBody.replace(/<p>\s*<strong>\s*4\.1\s*<\/strong>\s*<br\s*\/?>[\s\S]*?<\/p>/i, CGEN_ULU_BONUS_CLAUSE_HTML);
+        // Normalize TO section spacing (can appear as one <p> or split across multiple <p>s).
+        updatedBody = updatedBody.replace(/<p>\s*<strong>\s*TO:\s*<\/strong>\s*<br\s*\/?>[\s\S]*?<\/p>/i, CGEN_ULU_TO_BLOCK_HTML);
+        updatedBody = updatedBody.replace(/<p>\s*<strong>\s*TO:\s*<\/strong>\s*<\/p>\s*[\s\S]*?<p>\s*\(\s*"you"\s*\)\s*<\/p>/i, CGEN_ULU_TO_BLOCK_HTML);
+        updatedBody = updatedBody.replace(/<p>\s*TO:\s*<br\s*\/?>[\s\S]*?<\/p>/i, CGEN_ULU_TO_BLOCK_HTML);
+        updatedBody = updatedBody.replace(/<p>\s*TO:\s*<\/p>\s*[\s\S]*?<p>\s*\(\s*"you"\s*\)\s*<\/p>/i, CGEN_ULU_TO_BLOCK_HTML);
+
+        // Normalize company signatory spacing to match remixers.
+        updatedBody = updatedBody.replace(
+          /<p>\s*Agreed and Accepted and date\s*<\/p>\s*(?:<br\s*\/?>\s*)*<p>\s*_+\s*<\/p>\s*(?:<br\s*\/?>\s*)*<p>\s*<strong>\s*Music Matters BYpittbull Ltd\s*<\/strong>\s*<\/p>\s*(?:<br\s*\/?>\s*)*/i,
+          cgenBuildSignatureBlockHtml(CGEN_ULU_COMPANY_NAME)
+        );
+        updatedBody = updatedBody.replace(
+          /<p>\s*Agreed and Accepted and date\s*<\/p>[\s\S]*?<p[^>]*>\s*(?:<strong>\s*)?Music Matters BYpittbull Ltd(?:\s*<\/strong>)?\s*<\/p>\s*(?:<br\s*\/?>\s*)*/i,
+          cgenBuildSignatureBlockHtml(CGEN_ULU_COMPANY_NAME)
+        );
+        updatedBody = cgenReplaceAllPlaceholderForms(updatedBody, 'Bonus 2 Amount', '');
+        return updatedBody;
+      }
+
+      function cgenParseAdvanceAmount(value) {
+        const raw = String(value || '').trim();
+        const match = raw.match(/^([$£€])\s*([\d,]+(?:\.\d{1,2})?)$/);
+        if (!match) return null;
+        return {
+          symbol: match[1],
+          amount: parseFloat(match[2].replace(/,/g, ''))
+        };
+      }
+
+      function cgenNumberToWordsBelowThousand(num) {
+        const ones = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+        const tens = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+        if (num < 20) return ones[num];
+        if (num < 100) {
+          const ten = Math.floor(num / 10);
+          const rest = num % 10;
+          return tens[ten] + (rest ? '-' + ones[rest] : '');
+        }
+        const hundred = Math.floor(num / 100);
+        const rest = num % 100;
+        return ones[hundred] + ' hundred' + (rest ? ' and ' + cgenNumberToWordsBelowThousand(rest) : '');
+      }
+
+      function cgenNumberToWords(num) {
+        if (!Number.isFinite(num) || num < 0) return '';
+        if (num === 0) return 'zero';
+        const scales = [
+          { value: 1000000000, label: 'billion' },
+          { value: 1000000, label: 'million' },
+          { value: 1000, label: 'thousand' }
+        ];
+        let remaining = Math.floor(num);
+        const parts = [];
+        scales.forEach(function(scale) {
+          if (remaining >= scale.value) {
+            const count = Math.floor(remaining / scale.value);
+            parts.push(cgenNumberToWordsBelowThousand(count) + ' ' + scale.label);
+            remaining %= scale.value;
+          }
+        });
+        if (remaining) {
+          parts.push(cgenNumberToWordsBelowThousand(remaining));
+        }
+        return parts.join(parts.length > 1 ? ' ' : '');
+      }
+
+      function cgenAdvanceAmountWords(value) {
+        const parsed = cgenParseAdvanceAmount(value);
+        if (!parsed) return '';
+        const currencyLabel = parsed.symbol === '$' ? 'dollars' : parsed.symbol === '£' ? 'pounds' : 'euros';
+        const whole = Math.floor(parsed.amount);
+        const cents = Math.round((parsed.amount - whole) * 100);
+        let words = cgenNumberToWords(whole) + ' ' + currencyLabel;
+        if (cents > 0) {
+          words += ' and ' + cgenNumberToWords(cents) + ' cents';
+        }
+        return words;
+      }
+
+      function cgenAmountWordsForField(amountValue, existingWordsValue, placeholderName) {
+        const manual = String(existingWordsValue || '').trim();
+        if (manual) return manual;
+        const auto = cgenAdvanceAmountWords(amountValue);
+        return auto ? auto : ('[' + String(placeholderName || 'Amount Words') + ']');
+      }
+
+      function cgenBuildSignatureBlockHtml(name) {
+        return '<p>Agreed and Accepted and date</p><br><br><br><p>____________________________</p><br><p><strong>' + cgenEscapeHtml(name) + '</strong></p><br><br>';
+      }
+
+      function cgenEnsureUluTemplateStructure(tpl) {
+        if (!cgenIsUluRemixTemplate(tpl)) return tpl;
+        const next = Object.assign({}, tpl);
+        const existingBody = cgenNormalizeTemplateHtml(next.body || '');
+        let updatedBody = existingBody;
+        updatedBody = cgenApplyUluApprovedClauses(updatedBody);
+        if (updatedBody && updatedBody.indexOf('{{Remixers Block}}') === -1) {
+          updatedBody += '<p>{{Remixers Block}}</p>';
+        }
+        if (updatedBody && updatedBody.indexOf('{{Remixer Signature Blocks}}') === -1) {
+          updatedBody += '<p>{{Remixer Signature Blocks}}</p>';
+        }
+        next.body = updatedBody;
+        next.customFields = CGEN_ULU_STANDARD_FIELDS.map(function(field) {
+          return { key: field.key, label: field.label, inputType: field.inputType };
+        });
+        return next;
+      }
+
+      function cgenGetUluTemplateCustomFields() {
+        return CGEN_ULU_STANDARD_FIELDS.map(function(field) {
+          return {
+            key: field.key,
+            label: field.label,
+            inputType: field.inputType
+          };
+        });
+      }
+
       function cgenSetTemplates(rows) {
-        customTemplates = Array.isArray(rows) ? rows.slice() : [];
+        customTemplates = Array.isArray(rows) ? rows.map(cgenEnsureUluTemplateStructure) : [];
         customDocTemplatesCache = customTemplates.slice();
       }
 
@@ -8124,12 +9455,49 @@ Best regards`;
         return customTemplates;
       }
 
-      function cgenGetTemplateTypes() {
-        return Array.from(new Set(customTemplates.map(function(t) {
-          return String(t && t.type || '').trim();
-        }).filter(Boolean))).sort(function(a, b) {
-          return a.localeCompare(b, undefined, { sensitivity: 'base' });
-        });
+      function cgenReadDocTypesStore() {
+        try {
+          const raw = JSON.parse(localStorage.getItem(CGEN_DOC_TYPES_STORAGE_KEY) || '[]');
+          return Array.isArray(raw) ? raw : [];
+        } catch (e) {
+          return [];
+        }
+      }
+
+      function cgenWriteDocTypesStore(types) {
+        try {
+          localStorage.setItem(CGEN_DOC_TYPES_STORAGE_KEY, JSON.stringify(Array.isArray(types) ? types : []));
+        } catch (e) {}
+      }
+
+      function cgenNormalizeDocTypeLabel(value) {
+        return String(value || '').trim().replace(/\s{2,}/g, ' ');
+      }
+
+      function cgenGetDocTypesFromTemplates() {
+        return customTemplates.map(function(t) {
+          return cgenNormalizeDocTypeLabel(t && t.type);
+        }).filter(Boolean);
+      }
+
+      function cgenGetDocTypes() {
+        const stored = cgenReadDocTypesStore().map(cgenNormalizeDocTypeLabel).filter(Boolean);
+        const fromTemplates = cgenGetDocTypesFromTemplates();
+        const unique = Array.from(new Set(stored.concat(fromTemplates)));
+        unique.sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
+        return unique;
+      }
+
+      function cgenAddDocType(label) {
+        const normalized = cgenNormalizeDocTypeLabel(label);
+        if (!normalized) return '';
+        const existing = cgenReadDocTypesStore().map(cgenNormalizeDocTypeLabel).filter(Boolean);
+        if (existing.indexOf(normalized) === -1) {
+          existing.push(normalized);
+          existing.sort(function(a, b) { return a.localeCompare(b, undefined, { sensitivity: 'base' }); });
+          cgenWriteDocTypesStore(existing);
+        }
+        return normalized;
       }
 
       const tplTypeCombo = comboEntry(get('cgen-tpl-type-select'), get('cgen-tpl-type-custom'), '__custom__');
@@ -8139,39 +9507,140 @@ Best regards`;
         get('cgen-add-tpl-title-text').textContent = 'Add Custom Template';
         get('cgen-tpl-name').value = '';
         tplTypeCombo.reset();
-        get('cgen-tpl-body').value = '';
+        get('cgen-tpl-body').innerHTML = '';
         tplCustomFieldRows = [];
+        cgenRemixerRows = [cgenMakeRemixerRow('', '')];
         cgenRenderTplCustomFieldRows();
         const fb = get('cgen-tpl-feedback');
         fb.textContent = '';
         fb.className = 'cgen-feedback';
       }
 
-      function cgenFormatPlainText(body) {
-        let text = String(body || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        text = text.split('\n').map(function(line) {
-          return line.replace(/[ \t]+$/g, '');
-        }).join('\n');
-        text = text.replace(/\n{3,}/g, '\n\n');
-        text = text.replace(/([^\n])\n(\d+\.\s)/g, '$1\n\n$2');
-        text = text.replace(/([^\n])\n([A-Z][A-Z0-9 ,/&()"'-.]{3,}:?)/g, function(match, a, b) {
-          return /\d+\.\s/.test(b) ? match : a + '\n\n' + b;
+      function cgenEditor() {
+        return get('cgen-tpl-body');
+      }
+
+      function cgenOutput() {
+        return get('cgen-output');
+      }
+
+      function cgenEscapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function cgenDecodeHtmlEntities(value) {
+        const raw = String(value || '');
+        if (raw.indexOf('&lt;') === -1 && raw.indexOf('&gt;') === -1 && raw.indexOf('&amp;') === -1) return raw;
+        const el = document.createElement('textarea');
+        el.innerHTML = raw;
+        return el.value;
+      }
+
+      function cgenHasHtmlMarkup(body) {
+        return /<([a-z][\w-]*)(\s[^>]*)?>/i.test(String(body || ''));
+      }
+
+      function cgenPlainTextToHtml(body) {
+        const normalized = String(body || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        if (!normalized.trim()) return '';
+        return normalized.split(/\n{2,}/).map(function(block) {
+          const lines = block.split('\n').map(function(line) {
+            return cgenEscapeHtml(line).replace(/ {2}/g, ' &nbsp;');
+          }).join('<br>');
+          return '<p>' + lines + '</p>';
+        }).join('');
+      }
+
+      function cgenNormalizeTemplateHtml(body) {
+        const raw = cgenDecodeHtmlEntities(String(body || ''));
+        if (!raw.trim()) return '';
+        return cgenHasHtmlMarkup(raw) ? raw : cgenPlainTextToHtml(raw);
+      }
+
+      function cgenGetEditorHtml(el) {
+        if (!el) return '';
+        return cgenNormalizeTemplateHtml(el.innerHTML || '');
+      }
+
+      function cgenInsertHtmlAtCursor(html) {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        const frag = document.createDocumentFragment();
+        let node;
+        let lastNode = null;
+        while ((node = temp.firstChild)) {
+          lastNode = frag.appendChild(node);
+        }
+        range.insertNode(frag);
+        if (lastNode) {
+          range.setStartAfter(lastNode);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+
+      function cgenTemplateToText(html) {
+        const temp = document.createElement('div');
+        temp.innerHTML = cgenNormalizeTemplateHtml(html);
+        return (temp.innerText || temp.textContent || '').trim();
+      }
+
+      function cgenBuildRemixersBlock(remixers) {
+        const rows = (remixers || []).filter(function(row) {
+          return String((row && row.name) || '').trim() || String((row && row.address) || '').trim();
         });
-        text = text.replace(/(Signature:\s*_+\n(?:Name|Title|Date):[^\n]*)(\n(?!\n))/g, '$1\n');
-        text = text.replace(/\n{3,}/g, '\n\n');
-        return text.trim();
+        return rows.map(function(row, index) {
+          const addressHtml = cgenEscapeHtml(row.address || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n/g, '<br>');
+          const block = '<strong>' + cgenEscapeHtml(row.name || '[Remixer Name]') + '</strong><br>' + (addressHtml || '[Remixer Address]');
+          return index === 0 ? block : 'and<br>' + block;
+        }).join('<br><br>');
+      }
+
+      function cgenBuildRemixerSignatureBlocks(remixers) {
+        const rows = (remixers || []).filter(function(row) {
+          return String((row && row.name) || '').trim() || String((row && row.address) || '').trim();
+        });
+        return rows.map(function(row) {
+          const name = row.name || '[Remixer Name]';
+          return '<p>Agreed and Accepted and date</p><br><br><p>____________________________</p><p><strong>' + cgenEscapeHtml(name) + '</strong></p>';
+        }).join('<br><br><br>');
+      }
+
+      function cgenApplyPlaceholdersToHtml(html, vars, htmlVars) {
+        let output = cgenNormalizeTemplateHtml(html);
+        Object.keys(vars || {}).forEach(function(k) {
+          output = cgenReplaceAllPlaceholderForms(output, k, cgenEscapeHtml(vars[k] || '[' + k + ']'));
+        });
+        Object.keys(htmlVars || {}).forEach(function(k) {
+          output = cgenReplaceAllPlaceholderForms(output, k, htmlVars[k] || '');
+        });
+        return output;
       }
 
       function cgenPopulateTypeSelect() {
         const sel = get('cgen-type-select');
         const current = sel.value;
         sel.innerHTML = '<option value="">— select type —</option>';
-        cgenGetTemplateTypes().forEach(function(type) {
+        cgenGetDocTypes().forEach(function(type) {
           const o = document.createElement('option');
           o.value = type;
           o.textContent = type;
           sel.appendChild(o);
         });
+        const add = document.createElement('option');
+        add.value = CGEN_DOC_TYPE_ADD_VALUE;
+        add.textContent = '+ Add Type';
+        sel.appendChild(add);
         if (current && Array.from(sel.options).some(function(o) { return o.value === current; })) sel.value = current;
         else if (!sel.value && sel.options.length > 1) sel.selectedIndex = 1;
         else sel.value = '';
@@ -8181,7 +9650,7 @@ Best regards`;
         const sel = get('cgen-tpl-type-select');
         const current = tplTypeCombo.getValue();
         sel.innerHTML = '<option value="">— select type —</option>';
-        cgenGetTemplateTypes().forEach(function(type) {
+        cgenGetDocTypes().forEach(function(type) {
           const o = document.createElement('option');
           o.value = type;
           o.textContent = type;
@@ -8221,7 +9690,51 @@ Best regards`;
 
       function cgenGetTemplateFieldDefs(tpl) {
         if (!tpl) return [];
-        const metadata = new Map();
+        if (cgenIsUluRemixTemplate(tpl)) {
+          return CGEN_ULU_STANDARD_FIELDS.map(function(field, index) {
+            return {
+              key: field.key,
+              label: field.label,
+              inputType: field.inputType,
+              placeholder: field.key,
+              inputId: 'cgen-cv-' + index
+            };
+          });
+        }
+        if (cgenIsUluMasterAgreementTemplate(tpl)) {
+          return CGEN_ULU_MASTER_FIELDS.map(function(field, index) {
+            return {
+              key: field.key,
+              label: field.label,
+              inputType: field.inputType,
+              placeholder: field.key,
+              inputId: 'cgen-cv-ulu-master-' + index
+            };
+          });
+        }
+	        if (cgenIsSingleSongAssignmentTemplate(tpl)) {
+	          return CGEN_SINGLE_SONG_FIELDS.map(function(field, index) {
+	            return {
+	              key: field.key,
+	              label: field.label,
+	              inputType: field.inputType,
+	              placeholder: field.key,
+	              inputId: 'cgen-cv-single-song-' + index
+	            };
+	          });
+	        }
+	        if (cgenIsMmsExclusivePublishingTemplate(tpl)) {
+	          return CGEN_MMS_EXCLUSIVE_PUBLISHING_FIELDS.map(function(field, index) {
+	            return {
+	              key: field.key,
+	              label: field.label,
+	              inputType: field.inputType,
+	              placeholder: field.key,
+	              inputId: 'cgen-cv-mms-exclusive-publishing-' + index
+	            };
+	          });
+	        }
+	        const metadata = new Map();
         (tpl.customFields || []).forEach(function(field, index) {
           const label = String(field && field.label || field && field.key || '').trim() || ('Field ' + (index + 1));
           const key = String(field && field.key || '').trim();
@@ -8249,11 +9762,473 @@ Best regards`;
         });
       }
 
+      function cgenRenderUluMasterAgreementFields(wrap, tpl) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (key && key !== cgenUluMasterLoadedKey) {
+          const loaded = cgenLoadUluMasterState(tpl);
+          cgenUluMasterLoadedKey = key;
+          cgenUluMasterFieldsState = loaded.fields || {};
+          cgenUluMasterArtists = loaded.artists && loaded.artists.length ? loaded.artists : [cgenMakeUluMasterArtistRow('', '', '')];
+          cgenUluMasterMasters = loaded.masters && loaded.masters.length ? loaded.masters : [cgenMakeUluMasterMasterRow('', '', '')];
+        }
+        if (!cgenUluMasterArtists.length) cgenUluMasterArtists = [cgenMakeUluMasterArtistRow('', '', '')];
+        if (!cgenUluMasterMasters.length) cgenUluMasterMasters = [cgenMakeUluMasterMasterRow('', '', '')];
+
+        function persist() {
+          cgenPersistUluMasterState(tpl, {
+            fields: cgenUluMasterFieldsState,
+            artists: cgenUluMasterArtists,
+            masters: cgenUluMasterMasters
+          });
+        }
+
+        const lbl = document.createElement('div');
+        lbl.className = 'cgen-section-label';
+        lbl.textContent = tpl.name + ' Fields';
+        wrap.appendChild(lbl);
+
+        // Date
+        (function() {
+          const div = document.createElement('div');
+          div.className = 'cgen-field';
+          div.innerHTML =
+            '<label class="cgen-label">Date</label>' +
+            '<input class="cgen-input" id="cgen-ulu-master-date" type="date" />';
+          wrap.appendChild(div);
+          const el = get('cgen-ulu-master-date');
+          el.value = String(cgenUluMasterFieldsState['Date'] || '');
+          el.addEventListener('input', function() {
+            cgenUluMasterFieldsState['Date'] = el.value || '';
+            persist();
+          });
+        })();
+
+        // Artists group
+        (function() {
+          const section = document.createElement('div');
+          section.className = 'cgen-field';
+          section.innerHTML = '<div class="cgen-section-label">Artists</div>';
+          const group = document.createElement('div');
+          group.className = 'cgen-remixers-group';
+
+          cgenUluMasterArtists.forEach(function(a, index) {
+            const card = document.createElement('div');
+            card.className = 'cgen-remixer-card';
+            card.innerHTML =
+              '<div class="cgen-remixer-header">' +
+                '<div class="cgen-remixer-title">Artist ' + (index + 1) + '</div>' +
+                (index === 0 ? '' : '<button class="btn btn-ghost cgen-ulu-master-artist-remove" type="button" data-index="' + index + '" style="font-size:12px;padding:4px 10px;">Remove</button>') +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Legal Name</label>' +
+                '<input class="cgen-input cgen-ulu-master-artist-input" type="text" data-index="' + index + '" data-role="legalName" value="' + escapeHtml(a.legalName || '') + '" />' +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">PKA Name</label>' +
+                '<input class="cgen-input cgen-ulu-master-artist-input" type="text" data-index="' + index + '" data-role="pkaName" value="' + escapeHtml(a.pkaName || '') + '" />' +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Address</label>' +
+                '<textarea class="cgen-textarea cgen-ulu-master-artist-input" rows="4" data-index="' + index + '" data-role="address">' + escapeHtml(a.address || '') + '</textarea>' +
+              '</div>';
+            group.appendChild(card);
+          });
+
+          const addBtn = document.createElement('button');
+          addBtn.className = 'btn btn-ghost';
+          addBtn.type = 'button';
+          addBtn.style.fontSize = '12px';
+          addBtn.style.padding = '6px 12px';
+          addBtn.textContent = '+ Add Artist';
+
+          section.appendChild(group);
+          section.appendChild(addBtn);
+          wrap.appendChild(section);
+
+          section.querySelectorAll('.cgen-ulu-master-artist-input').forEach(function(el) {
+            el.addEventListener('input', function() {
+              const i = parseInt(el.dataset.index, 10);
+              const role = el.dataset.role;
+              if (!cgenUluMasterArtists[i]) return;
+              cgenUluMasterArtists[i][role] = el.value || '';
+              persist();
+            });
+          });
+          section.querySelectorAll('.cgen-ulu-master-artist-remove').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              const i = parseInt(btn.dataset.index, 10);
+              cgenUluMasterArtists.splice(i, 1);
+              if (!cgenUluMasterArtists.length) cgenUluMasterArtists = [cgenMakeUluMasterArtistRow('', '', '')];
+              persist();
+              cgenRenderCustomVarFields();
+            });
+          });
+          addBtn.addEventListener('click', function() {
+            cgenUluMasterArtists.push(cgenMakeUluMasterArtistRow('', '', ''));
+            persist();
+            cgenRenderCustomVarFields();
+          });
+        })();
+
+        // Masters group
+        (function() {
+          const section = document.createElement('div');
+          section.className = 'cgen-field';
+          section.innerHTML = '<div class="cgen-section-label">Product Commitment / Masters</div>';
+          const group = document.createElement('div');
+          group.className = 'cgen-remixers-group';
+
+          cgenUluMasterMasters.forEach(function(m, index) {
+            const card = document.createElement('div');
+            card.className = 'cgen-remixer-card';
+            card.innerHTML =
+              '<div class="cgen-remixer-header">' +
+                '<div class="cgen-remixer-title">Master ' + (index + 1) + '</div>' +
+                (index === 0 ? '' : '<button class="btn btn-ghost cgen-ulu-master-master-remove" type="button" data-index="' + index + '" style="font-size:12px;padding:4px 10px;">Remove</button>') +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Master Count Words</label>' +
+                '<input class="cgen-input cgen-ulu-master-master-input" type="text" data-index="' + index + '" data-role="countWords" value="' + escapeHtml(m.countWords || '') + '" />' +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Master Count Number</label>' +
+                '<input class="cgen-input cgen-ulu-master-master-input" type="text" data-index="' + index + '" data-role="countNumber" value="' + escapeHtml(m.countNumber || '') + '" />' +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Master Title</label>' +
+                '<input class="cgen-input cgen-ulu-master-master-input" type="text" data-index="' + index + '" data-role="title" value="' + escapeHtml(m.title || '') + '" />' +
+              '</div>';
+            group.appendChild(card);
+          });
+
+          const addBtn = document.createElement('button');
+          addBtn.className = 'btn btn-ghost';
+          addBtn.type = 'button';
+          addBtn.style.fontSize = '12px';
+          addBtn.style.padding = '6px 12px';
+          addBtn.textContent = '+ Add Master';
+
+          section.appendChild(group);
+          section.appendChild(addBtn);
+          wrap.appendChild(section);
+
+          section.querySelectorAll('.cgen-ulu-master-master-input').forEach(function(el) {
+            el.addEventListener('input', function() {
+              const i = parseInt(el.dataset.index, 10);
+              const role = el.dataset.role;
+              if (!cgenUluMasterMasters[i]) return;
+              cgenUluMasterMasters[i][role] = el.value || '';
+              persist();
+            });
+          });
+          section.querySelectorAll('.cgen-ulu-master-master-remove').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              const i = parseInt(btn.dataset.index, 10);
+              cgenUluMasterMasters.splice(i, 1);
+              if (!cgenUluMasterMasters.length) cgenUluMasterMasters = [cgenMakeUluMasterMasterRow('', '', '')];
+              persist();
+              cgenRenderCustomVarFields();
+            });
+          });
+          addBtn.addEventListener('click', function() {
+            cgenUluMasterMasters.push(cgenMakeUluMasterMasterRow('', '', ''));
+            persist();
+            cgenRenderCustomVarFields();
+          });
+        })();
+
+        // Options Text
+        (function() {
+          const div = document.createElement('div');
+          div.className = 'cgen-field';
+          div.innerHTML =
+            '<label class="cgen-label">Options Text</label>' +
+            '<textarea class="cgen-textarea" id="cgen-ulu-master-options" rows="4"></textarea>';
+          wrap.appendChild(div);
+          const el = get('cgen-ulu-master-options');
+          el.value = String(cgenUluMasterFieldsState['Options Text'] || '');
+          el.addEventListener('input', function() {
+            cgenUluMasterFieldsState['Options Text'] = el.value || '';
+            persist();
+          });
+        })();
+
+        // Advance amount fields
+        (function() {
+          const divWords = document.createElement('div');
+          divWords.className = 'cgen-field';
+          divWords.innerHTML =
+            '<label class="cgen-label">Advance Amount Words</label>' +
+            '<input class="cgen-input" id="cgen-ulu-master-advance-words" type="text" />';
+          wrap.appendChild(divWords);
+          const elW = get('cgen-ulu-master-advance-words');
+          elW.value = String(cgenUluMasterFieldsState['Advance Amount Words'] || '');
+          elW.addEventListener('input', function() {
+            cgenUluMasterFieldsState['Advance Amount Words'] = elW.value || '';
+            persist();
+          });
+
+          const divNum = document.createElement('div');
+          divNum.className = 'cgen-field';
+          divNum.innerHTML =
+            '<label class="cgen-label">Advance Amount Number</label>' +
+            '<input class="cgen-input" id="cgen-ulu-master-advance-number" type="text" />';
+          wrap.appendChild(divNum);
+          const elN = get('cgen-ulu-master-advance-number');
+          elN.value = String(cgenUluMasterFieldsState['Advance Amount Number'] || '');
+          elN.addEventListener('input', function() {
+            cgenUluMasterFieldsState['Advance Amount Number'] = elN.value || '';
+            persist();
+          });
+        })();
+      }
+
+      function cgenRenderSingleSongAssignmentFields(wrap, tpl) {
+        const key = cgenRemixersKeyForTemplate(tpl);
+        if (key && key !== cgenSingleSongLoadedKey) {
+          const loaded = cgenLoadSingleSongState(tpl);
+          cgenSingleSongLoadedKey = key;
+          cgenSingleSongFieldsState = loaded.fields || {};
+          cgenSingleSongWriters = loaded.writers && loaded.writers.length ? loaded.writers : [cgenMakeSingleSongWriterRow('', '', '', '', '')];
+          if (!String(cgenSingleSongFieldsState['Consideration Amount'] || '').trim()) {
+            cgenSingleSongFieldsState['Consideration Amount'] = CGEN_SINGLE_SONG_DEFAULT_CONSIDERATION;
+          }
+        }
+        if (!cgenSingleSongWriters.length) cgenSingleSongWriters = [cgenMakeSingleSongWriterRow('', '', '', '', '')];
+
+        function persist() {
+          cgenPersistSingleSongState(tpl, { fields: cgenSingleSongFieldsState, writers: cgenSingleSongWriters });
+        }
+
+        const lbl = document.createElement('div');
+        lbl.className = 'cgen-section-label';
+        lbl.textContent = tpl.name + ' Fields';
+        wrap.appendChild(lbl);
+
+        // Date
+        (function() {
+          const div = document.createElement('div');
+          div.className = 'cgen-field';
+          div.innerHTML =
+            '<label class="cgen-label">Date</label>' +
+            '<input class="cgen-input" id="cgen-single-song-date" type="date" />';
+          wrap.appendChild(div);
+          const el = get('cgen-single-song-date');
+          el.value = String(cgenSingleSongFieldsState['Date'] || '');
+          el.addEventListener('input', function() {
+            cgenSingleSongFieldsState['Date'] = el.value || '';
+            persist();
+          });
+        })();
+
+        // Writers group
+        (function() {
+          const section = document.createElement('div');
+          section.className = 'cgen-field';
+          section.innerHTML = '<div class="cgen-section-label">Writers</div>';
+          const group = document.createElement('div');
+          group.className = 'cgen-remixers-group';
+
+          cgenSingleSongWriters.forEach(function(w, index) {
+            const card = document.createElement('div');
+            card.className = 'cgen-remixer-card';
+            card.innerHTML =
+              '<div class="cgen-remixer-header">' +
+                '<div class="cgen-remixer-title">Writer ' + (index + 1) + '</div>' +
+                (index === 0 ? '' : '<button class="btn btn-ghost cgen-single-song-writer-remove" type="button" data-index="' + index + '" style="font-size:12px;padding:4px 10px;">Remove</button>') +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Legal Name</label>' +
+                '<input class="cgen-input cgen-single-song-writer-input" type="text" data-index="' + index + '" data-role="legalName" value="' + escapeHtml(w.legalName || '') + '" />' +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">PKA Name</label>' +
+                '<input class="cgen-input cgen-single-song-writer-input" type="text" data-index="' + index + '" data-role="pkaName" value="' + escapeHtml(w.pkaName || '') + '" />' +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Address</label>' +
+                '<textarea class="cgen-textarea cgen-single-song-writer-input" rows="4" data-index="' + index + '" data-role="address">' + escapeHtml(w.address || '') + '</textarea>' +
+              '</div>';
+            group.appendChild(card);
+          });
+
+          const addBtn = document.createElement('button');
+          addBtn.className = 'btn btn-ghost';
+          addBtn.type = 'button';
+          addBtn.style.fontSize = '12px';
+          addBtn.style.padding = '6px 12px';
+          addBtn.textContent = '+ Add Writer';
+
+          section.appendChild(group);
+          section.appendChild(addBtn);
+          wrap.appendChild(section);
+
+          section.querySelectorAll('.cgen-single-song-writer-input').forEach(function(el) {
+            el.addEventListener('input', function() {
+              const i = parseInt(el.dataset.index, 10);
+              const role = el.dataset.role;
+              if (!cgenSingleSongWriters[i]) return;
+              cgenSingleSongWriters[i][role] = el.value || '';
+              persist();
+            });
+          });
+          section.querySelectorAll('.cgen-single-song-writer-remove').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+              const i = parseInt(btn.dataset.index, 10);
+              cgenSingleSongWriters.splice(i, 1);
+              if (!cgenSingleSongWriters.length) cgenSingleSongWriters = [cgenMakeSingleSongWriterRow('', '', '', '', '')];
+              persist();
+              cgenRenderCustomVarFields();
+            });
+          });
+          addBtn.addEventListener('click', function() {
+            cgenSingleSongWriters.push(cgenMakeSingleSongWriterRow('', '', '', '', ''));
+            persist();
+            cgenRenderCustomVarFields();
+          });
+        })();
+
+        // Works / Splits (linked to writers)
+        (function() {
+          const section = document.createElement('div');
+          section.className = 'cgen-field';
+          section.innerHTML = '<div class="cgen-section-label">Works / Splits</div>';
+          const group = document.createElement('div');
+          group.className = 'cgen-remixers-group';
+
+          cgenSingleSongWriters.forEach(function(w, index) {
+            const card = document.createElement('div');
+            card.className = 'cgen-remixer-card';
+            card.innerHTML =
+              '<div class="cgen-remixer-header">' +
+                '<div class="cgen-remixer-title">' + escapeHtml(cgenSingleSongWriterDisplayName(w)) + '</div>' +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Work Title</label>' +
+                '<input class="cgen-input cgen-single-song-work-input" type="text" data-index="' + index + '" data-role="workTitle" value="' + escapeHtml(w.workTitle || '') + '" />' +
+              '</div>' +
+              '<div class="cgen-field" style="margin:0;">' +
+                '<label class="cgen-label">Ownership %</label>' +
+                '<input class="cgen-input cgen-single-song-work-input" type="text" data-index="' + index + '" data-role="ownershipPct" value="' + escapeHtml(w.ownershipPct || '') + '" />' +
+              '</div>';
+            group.appendChild(card);
+          });
+
+          section.appendChild(group);
+          wrap.appendChild(section);
+
+          section.querySelectorAll('.cgen-single-song-work-input').forEach(function(el) {
+            el.addEventListener('input', function() {
+              const i = parseInt(el.dataset.index, 10);
+              const role = el.dataset.role;
+              if (!cgenSingleSongWriters[i]) return;
+              cgenSingleSongWriters[i][role] = el.value || '';
+              persist();
+            });
+          });
+        })();
+
+        // Consideration Amount
+        (function() {
+          const div = document.createElement('div');
+          div.className = 'cgen-field';
+          div.innerHTML =
+            '<label class="cgen-label">Consideration Amount</label>' +
+            '<input class="cgen-input" id="cgen-single-song-consideration" type="text" />';
+          wrap.appendChild(div);
+          const el = get('cgen-single-song-consideration');
+          el.value = String(cgenSingleSongFieldsState['Consideration Amount'] || CGEN_SINGLE_SONG_DEFAULT_CONSIDERATION);
+          el.addEventListener('input', function() {
+            cgenSingleSongFieldsState['Consideration Amount'] = el.value || '';
+            persist();
+          });
+        })();
+
+        // Writer Approval Email
+        (function() {
+          const div = document.createElement('div');
+          div.className = 'cgen-field';
+          div.innerHTML =
+            '<label class="cgen-label">Writer Approval Email</label>' +
+            '<input class="cgen-input" id="cgen-single-song-approval-email" type="text" />';
+          wrap.appendChild(div);
+          const el = get('cgen-single-song-approval-email');
+          el.value = String(cgenSingleSongFieldsState['Writer Approval Email'] || '');
+          el.addEventListener('input', function() {
+            cgenSingleSongFieldsState['Writer Approval Email'] = el.value || '';
+            persist();
+          });
+        })();
+      }
+
+      function cgenRenderUluRemixers(wrap) {
+        const section = document.createElement('div');
+        section.className = 'cgen-field';
+        section.innerHTML = '<div class="cgen-section-label">Remixers</div>';
+        const group = document.createElement('div');
+        group.className = 'cgen-remixers-group';
+
+        cgenRemixerRows.forEach(function(row, index) {
+          const card = document.createElement('div');
+          card.className = 'cgen-remixer-card';
+          card.innerHTML =
+            '<div class="cgen-remixer-header">' +
+              '<div class="cgen-remixer-title">Remixer ' + (index + 1) + '</div>' +
+              (index === 0 ? '' : '<button class="btn btn-ghost cgen-remixer-remove-btn" type="button" data-index="' + index + '" style="font-size:12px;padding:4px 10px;">Remove</button>') +
+            '</div>' +
+            '<div class="cgen-field" style="margin:0;">' +
+              '<label class="cgen-label">Remixer Name</label>' +
+              '<input class="cgen-input cgen-remixer-input" type="text" data-index="' + index + '" data-role="name" value="' + escapeHtml(row.name || '') + '" />' +
+            '</div>' +
+            '<div class="cgen-field" style="margin:0;">' +
+              '<label class="cgen-label">Remixer Address</label>' +
+              '<textarea class="cgen-textarea cgen-remixer-input" rows="4" data-index="' + index + '" data-role="address">' + escapeHtml(row.address || '') + '</textarea>' +
+            '</div>';
+          group.appendChild(card);
+        });
+
+        const addBtn = document.createElement('button');
+        addBtn.className = 'btn btn-ghost';
+        addBtn.type = 'button';
+        addBtn.id = 'cgen-add-remixer-btn';
+        addBtn.style.fontSize = '12px';
+        addBtn.style.padding = '6px 12px';
+        addBtn.textContent = '+ Add Remixer';
+
+        section.appendChild(group);
+        section.appendChild(addBtn);
+        wrap.appendChild(section);
+
+        wrap.querySelectorAll('.cgen-remixer-input').forEach(function(el) {
+          el.addEventListener('input', function() {
+            const index = parseInt(el.dataset.index, 10);
+            const role = el.dataset.role;
+            if (!cgenRemixerRows[index]) return;
+            cgenRemixerRows[index][role] = el.value || '';
+            cgenPersistCurrentRemixers();
+          });
+        });
+        wrap.querySelectorAll('.cgen-remixer-remove-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            const index = parseInt(btn.dataset.index, 10);
+            cgenRemixerRows.splice(index, 1);
+            if (!cgenRemixerRows.length) cgenRemixerRows = [cgenMakeRemixerRow('', '')];
+            cgenPersistCurrentRemixers();
+            cgenRenderCustomVarFields();
+          });
+        });
+        addBtn.addEventListener('click', function() {
+          cgenRemixerRows.push(cgenMakeRemixerRow('', ''));
+          cgenPersistCurrentRemixers();
+          cgenRenderCustomVarFields();
+        });
+      }
+
       function cgenPopulateTemplateSelect() {
         const type = get('cgen-type-select').value;
         const sel = get('cgen-template-select');
         const current = sel.value;
-        sel.innerHTML = '';
+        sel.innerHTML = '<option value="">— select template —</option>';
         customTemplates.filter(function(t) { return t.type === type; }).forEach(function(t) {
           const o = document.createElement('option');
           o.value = 'custom:' + t.id;
@@ -8274,6 +10249,14 @@ Best regards`;
           wrap.appendChild(msg);
           return;
         }
+        if (cgenIsUluMasterAgreementTemplate(tpl)) {
+          cgenRenderUluMasterAgreementFields(wrap, tpl);
+          return;
+        }
+        if (cgenIsSingleSongAssignmentTemplate(tpl)) {
+          cgenRenderSingleSongAssignmentFields(wrap, tpl);
+          return;
+        }
         const fields = cgenGetTemplateFieldDefs(tpl);
         if (!fields.length) {
           const msg = document.createElement('div');
@@ -8283,47 +10266,286 @@ Best regards`;
           return;
         }
         const lbl = document.createElement('div');
-        lbl.className = 'cgen-section-label';
-        lbl.textContent = tpl.name + ' Fields';
-        wrap.appendChild(lbl);
-        fields.forEach(function(f) {
-          const div = document.createElement('div');
-          div.className = 'cgen-field';
+	        lbl.className = 'cgen-section-label';
+	        lbl.textContent = tpl.name + ' Fields';
+	        wrap.appendChild(lbl);
+	        const uluSavedValues = cgenIsUluRemixTemplate(tpl) ? cgenLoadUluRemixFieldValues(tpl) : null;
+	        const mmsSavedValues = cgenIsMmsExclusivePublishingTemplate(tpl) ? cgenLoadMmsExclusivePublishingFieldValues(tpl) : null;
+	        fields.forEach(function(f) {
+	          const div = document.createElement('div');
+	          div.className = 'cgen-field';
+          const isAdvanceAmountField = cgenIsUluRemixTemplate(tpl) && f.placeholder === 'Advance Amount';
+          const isAmountWordsField = cgenIsUluRemixTemplate(tpl) && /Amount Words$/.test(String(f.placeholder || ''));
+          const fieldPlaceholder = isAdvanceAmountField ? 'Include currency symbol, e.g. $1000, £500, €750' : '';
+          const wordsPlaceholder = isAmountWordsField ? 'e.g. one thousand dollars' : '';
+          const effectivePlaceholder = isAmountWordsField ? wordsPlaceholder : fieldPlaceholder;
+          const fieldTitle = isAdvanceAmountField ? 'Currency symbol required before the amount.' : '';
           div.innerHTML =
             '<label class="cgen-label">' + escapeHtml(f.label || f.placeholder || 'Field') + '</label>' +
             (f.inputType === 'textarea'
-              ? '<textarea class="cgen-textarea" id="' + f.inputId + '" rows="2"></textarea>'
-              : '<input class="cgen-input" id="' + f.inputId + '" type="' + (f.inputType === 'number' ? 'number' : f.inputType === 'date' ? 'date' : 'text') + '" />');
+              ? '<textarea class="cgen-textarea" id="' + f.inputId + '" rows="2" placeholder="' + escapeHtml(effectivePlaceholder) + '" title="' + escapeHtml(fieldTitle) + '"></textarea>'
+              : '<input class="cgen-input" id="' + f.inputId + '" type="' + (f.inputType === 'number' ? 'number' : f.inputType === 'date' ? 'date' : 'text') + '" placeholder="' + escapeHtml(effectivePlaceholder) + '" title="' + escapeHtml(fieldTitle) + '" />');
           wrap.appendChild(div);
-        });
+
+	          if (uluSavedValues && f && f.placeholder) {
+	            const el = get(f.inputId);
+	            if (el) {
+	              const saved = String(uluSavedValues[String(f.placeholder)] || '');
+	              if (saved) el.value = saved;
+	              const persist = function() {
+	                cgenPersistUluRemixFieldValue(tpl, f.placeholder, el.value || '');
+	              };
+	              el.addEventListener('input', persist);
+	              el.addEventListener('change', persist);
+	            }
+	          }
+	          if (mmsSavedValues && f && f.placeholder) {
+	            const el = get(f.inputId);
+	            if (el) {
+	              const saved = String(mmsSavedValues[String(f.placeholder)] || '');
+	              const defaultValue = CGEN_MMS_EXCLUSIVE_PUBLISHING_DEFAULTS[String(f.placeholder)] || '';
+	              if (saved) el.value = saved;
+	              else if (defaultValue) el.value = defaultValue;
+	              const persist = function() {
+	                cgenPersistMmsExclusivePublishingFieldValue(tpl, f.placeholder, el.value || '');
+	              };
+	              el.addEventListener('input', persist);
+	              el.addEventListener('change', persist);
+	              if (!saved && defaultValue) persist();
+	            }
+	          }
+	        });
+        if (cgenIsUluRemixTemplate(tpl)) {
+          const remixerKey = cgenRemixersKeyForTemplate(tpl);
+          if (remixerKey && remixerKey !== cgenRemixersLoadedKey) {
+            const storedRows = cgenLoadRemixersForTemplate(tpl);
+            cgenRemixerRows = storedRows.length ? storedRows : [cgenMakeRemixerRow('', '')];
+            cgenRemixersLoadedKey = remixerKey;
+          }
+          if (!cgenRemixerRows.length) cgenRemixerRows = [cgenMakeRemixerRow('', '')];
+          cgenRenderUluRemixers(wrap);
+        }
       }
 
       function cgenGetTemplateBody() {
         const tpl = cgenGetSelectedTemplate();
-        return tpl ? tpl.body : '';
+        return tpl ? cgenNormalizeTemplateHtml(tpl.body) : '';
       }
 
       function cgenGenerate() {
         let body = cgenGetTemplateBody();
-        if (!body) { get('cgen-output').value = 'No template selected.'; return; }
+        if (!body) { cgenOutput().innerHTML = '<p>No template selected.</p>'; return; }
         const tpl = cgenGetSelectedTemplate();
         const vars = {};
+        const htmlVars = {};
         cgenGetTemplateFieldDefs(tpl).forEach(function(f) {
           const el = get(f.inputId);
           vars[f.placeholder] = el ? (el.value || '').trim() : '';
         });
-        Object.keys(vars).forEach(function(k) {
-          const re = new RegExp('\\{\\{\\s*' + cgenEscapeRegex(k) + '\\s*\\}\\}', 'g');
-          body = body.replace(re, vars[k] || '[' + k + ']');
-        });
-        get('cgen-output').value = cgenFormatPlainText(body);
+	        if (cgenIsUluRemixTemplate(tpl)) {
+	          vars['Advance Amount Words'] = cgenAmountWordsForField(vars['Advance Amount'], vars['Advance Amount Words'], 'Advance Amount Words');
+	          vars['Bonus 1 Amount Words'] = cgenAmountWordsForField(vars['Bonus 1 Amount'], vars['Bonus 1 Amount Words'], 'Bonus 1 Amount Words');
+	          htmlVars['Remixers Block'] = cgenBuildRemixersBlock(cgenRemixerRows);
+	          htmlVars['Remixer Signature Blocks'] = cgenBuildRemixerSignatureBlocks(cgenRemixerRows);
+	          cgenPersistCurrentRemixers();
+	          Object.keys(vars).forEach(function(k) {
+	            cgenPersistUluRemixFieldValue(tpl, k, vars[k]);
+	          });
+	        } else if (cgenIsMmsExclusivePublishingTemplate(tpl)) {
+	          Object.keys(CGEN_MMS_EXCLUSIVE_PUBLISHING_DEFAULTS).forEach(function(k) {
+	            if (!String(vars[k] || '').trim()) vars[k] = String(CGEN_MMS_EXCLUSIVE_PUBLISHING_DEFAULTS[k] || '');
+	          });
+	          Object.keys(vars).forEach(function(k) {
+	            cgenPersistMmsExclusivePublishingFieldValue(tpl, k, vars[k]);
+	          });
+	        } else if (cgenIsUluMasterAgreementTemplate(tpl)) {
+	          body = cgenNormalizeUluMasterMastersContainer(body);
+	          const key = cgenRemixersKeyForTemplate(tpl);
+	          if (key && key !== cgenUluMasterLoadedKey) {
+            const loaded = cgenLoadUluMasterState(tpl);
+            cgenUluMasterLoadedKey = key;
+            cgenUluMasterFieldsState = loaded.fields || {};
+            cgenUluMasterArtists = loaded.artists && loaded.artists.length ? loaded.artists : [cgenMakeUluMasterArtistRow('', '', '')];
+            cgenUluMasterMasters = loaded.masters && loaded.masters.length ? loaded.masters : [cgenMakeUluMasterMasterRow('', '', '')];
+          }
+          vars['Date'] = String(cgenUluMasterFieldsState['Date'] || '');
+          vars['Options Text'] = String((cgenUluMasterFieldsState['Options Text'] || '').trim() ? cgenUluMasterFieldsState['Options Text'] : '-');
+          vars['Advance Amount Words'] = String(cgenUluMasterFieldsState['Advance Amount Words'] || '');
+          vars['Advance Amount Number'] = String(cgenUluMasterFieldsState['Advance Amount Number'] || '');
+          htmlVars['Artists Block'] = cgenBuildUluMasterArtistsBlock(cgenUluMasterArtists);
+          htmlVars['Masters Block'] = cgenBuildUluMasterMastersBlock(cgenUluMasterMasters);
+          htmlVars['Company Signature Block'] = cgenBuildUluMasterCompanySignatureBlock();
+          htmlVars['Artist Signature Blocks'] = cgenBuildUluMasterArtistSignatureBlocks(cgenUluMasterArtists);
+          cgenPersistUluMasterState(tpl, { fields: cgenUluMasterFieldsState, artists: cgenUluMasterArtists, masters: cgenUluMasterMasters });
+        } else if (cgenIsSingleSongAssignmentTemplate(tpl)) {
+          const key = cgenRemixersKeyForTemplate(tpl);
+          if (key && key !== cgenSingleSongLoadedKey) {
+            const loaded = cgenLoadSingleSongState(tpl);
+            cgenSingleSongLoadedKey = key;
+            cgenSingleSongFieldsState = loaded.fields || {};
+            cgenSingleSongWriters = loaded.writers && loaded.writers.length ? loaded.writers : [cgenMakeSingleSongWriterRow('', '', '', '', '')];
+            if (!String(cgenSingleSongFieldsState['Consideration Amount'] || '').trim()) {
+              cgenSingleSongFieldsState['Consideration Amount'] = CGEN_SINGLE_SONG_DEFAULT_CONSIDERATION;
+            }
+          }
+          vars['Date'] = String(cgenSingleSongFieldsState['Date'] || '');
+          vars['Consideration Amount'] = String(cgenSingleSongFieldsState['Consideration Amount'] || CGEN_SINGLE_SONG_DEFAULT_CONSIDERATION);
+          vars['Writer Approval Email'] = String(cgenSingleSongFieldsState['Writer Approval Email'] || '');
+          htmlVars['Writers Block'] = cgenBuildSingleSongWritersBlock(cgenSingleSongWriters);
+          htmlVars['Works Split Block'] = cgenBuildSingleSongWorksSplitBlock(cgenSingleSongWriters);
+          htmlVars['Writer Signature Blocks'] = cgenBuildSingleSongWriterSignatureBlocks(cgenSingleSongWriters);
+          htmlVars['Publisher Signature Block'] = cgenBuildSingleSongPublisherSignatureBlock();
+          cgenPersistSingleSongState(tpl, { fields: cgenSingleSongFieldsState, writers: cgenSingleSongWriters });
+        }
+        cgenOutput().innerHTML = cgenApplyPlaceholdersToHtml(body, vars, htmlVars);
       }
 
-      function cgenCopy() {
-        const ta = get('cgen-output');
-        const textToCopy = ta.value;
-        ta.select();
-        try { document.execCommand('copy'); } catch(e) { navigator.clipboard && navigator.clipboard.writeText(textToCopy); }
+      async function cgenEnsureUluMasterAgreementTemplateExists() {
+        if (!db) return;
+        try {
+          const { data } = await db.from('contract_templates').select('id').eq('name', CGEN_ULU_MASTER_TEMPLATE_NAME).maybeSingle();
+          if (data && data.id) return;
+        } catch (e) {}
+        const payload = {
+          name: CGEN_ULU_MASTER_TEMPLATE_NAME,
+          type: CGEN_ULU_MASTER_TEMPLATE_TYPE,
+          body: CGEN_ULU_MASTER_TEMPLATE_BODY_HTML,
+          custom_fields: CGEN_ULU_MASTER_FIELDS.map(function(f) {
+            return { label: f.label, key: f.key, inputType: f.inputType };
+          })
+        };
+        const { error } = await db.from('contract_templates').insert(payload);
+        if (error) throw error;
+      }
+
+      async function cgenEnsureSingleSongAssignmentTemplateExists() {
+        if (!db) return;
+        try {
+          const { data } = await db
+            .from('contract_templates')
+            .select('id,type,body')
+            .eq('name', CGEN_SINGLE_SONG_TEMPLATE_NAME)
+            .maybeSingle();
+          if (data && data.id) {
+            const currentBody = String(data.body || '');
+            const needsBodyUpdate =
+              currentBody.indexOf('<span style="color: red;">{{Writer Approval Email}}</span>') === -1 ||
+              currentBody.indexOf('<p style="color: red;">\nIt is understood that your royalty will be cross recoupable') === -1;
+            const needsTypeUpdate = String(data.type || '').trim() !== CGEN_SINGLE_SONG_TEMPLATE_TYPE;
+            if (!needsBodyUpdate && !needsTypeUpdate) return;
+            const payload = {};
+            if (needsBodyUpdate) payload.body = CGEN_SINGLE_SONG_TEMPLATE_BODY_HTML;
+            if (needsTypeUpdate) payload.type = CGEN_SINGLE_SONG_TEMPLATE_TYPE;
+            const { error } = await db.from('contract_templates').update(payload).eq('id', data.id);
+            if (error) throw error;
+            return;
+          }
+        } catch (e) {}
+        const payload = {
+          name: CGEN_SINGLE_SONG_TEMPLATE_NAME,
+          type: CGEN_SINGLE_SONG_TEMPLATE_TYPE,
+          body: CGEN_SINGLE_SONG_TEMPLATE_BODY_HTML,
+          custom_fields: CGEN_SINGLE_SONG_FIELDS.map(function(f) {
+            return { label: f.label, key: f.key, inputType: f.inputType };
+          })
+        };
+        const { error } = await db.from('contract_templates').insert(payload);
+        if (error) throw error;
+      }
+
+      async function cgenEnsureMmsExclusivePublishingAgreementTemplateExists() {
+        if (!db) return;
+        try {
+          const { data } = await db
+            .from('contract_templates')
+            .select('id,type,body,custom_fields')
+            .eq('name', CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_NAME)
+            .maybeSingle();
+          if (data && data.id) {
+            const currentBody = String(data.body || '');
+            const needsBodyUpdate = currentBody !== CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_BODY_HTML;
+            const needsTypeUpdate = String(data.type || '').trim() !== CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_TYPE;
+            const desiredFields = CGEN_MMS_EXCLUSIVE_PUBLISHING_FIELDS.map(function(f) {
+              return { label: f.label, key: f.key, inputType: f.inputType };
+            });
+            const currentFieldsRaw = Array.isArray(data.custom_fields) ? data.custom_fields : [];
+            const currentFieldsNorm = JSON.stringify(currentFieldsRaw.map(function(f) {
+              return { label: f && f.label, key: f && f.key, inputType: f && (f.inputType || f.input_type) };
+            }));
+            const desiredFieldsNorm = JSON.stringify(desiredFields);
+            const needsFieldsUpdate = currentFieldsNorm !== desiredFieldsNorm;
+            if (!needsBodyUpdate && !needsTypeUpdate && !needsFieldsUpdate) return;
+            const payload = {};
+            if (needsBodyUpdate) payload.body = CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_BODY_HTML;
+            if (needsTypeUpdate) payload.type = CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_TYPE;
+            if (needsFieldsUpdate) payload.custom_fields = desiredFields;
+            const { error } = await db.from('contract_templates').update(payload).eq('id', data.id);
+            if (error) throw error;
+            return;
+          }
+        } catch (e) {}
+        const payload = {
+          name: CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_NAME,
+          type: CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_TYPE,
+          body: CGEN_MMS_EXCLUSIVE_PUBLISHING_TEMPLATE_BODY_HTML,
+          custom_fields: CGEN_MMS_EXCLUSIVE_PUBLISHING_FIELDS.map(function(f) {
+            return { label: f.label, key: f.key, inputType: f.inputType };
+          })
+        };
+        const { error } = await db.from('contract_templates').insert(payload);
+        if (error) throw error;
+      }
+
+      async function cgenEnsureUluRemixAgreementType() {
+        if (!db) return;
+        try {
+          const { data } = await db
+            .from('contract_templates')
+            .select('id,type')
+            .eq('name', CGEN_ULU_TEMPLATE_NAME)
+            .maybeSingle();
+          if (!data || !data.id) return;
+          const currentType = String(data.type || '').trim();
+          if (currentType === 'Remix Agreement') return;
+          const { error } = await db.from('contract_templates').update({ type: 'Remix Agreement' }).eq('id', data.id);
+          if (error) throw error;
+        } catch (e) {}
+      }
+
+      async function cgenCopy() {
+        const preview = cgenOutput();
+        const htmlToCopy = cgenNormalizeTemplateHtml(preview.innerHTML || '');
+        const textToCopy = cgenTemplateToText(htmlToCopy);
+        let copied = false;
+        if (navigator.clipboard && window.ClipboardItem) {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                'text/html': new Blob([htmlToCopy], { type: 'text/html' }),
+                'text/plain': new Blob([textToCopy], { type: 'text/plain' })
+              })
+            ]);
+            copied = true;
+          } catch (err) {
+            copied = false;
+          }
+        }
+        if (!copied) {
+          const sel = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(preview);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          try {
+            copied = document.execCommand('copy');
+          } catch (e) {
+            copied = false;
+          }
+          sel.removeAllRanges();
+        }
+        if (!copied && navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(textToCopy);
+        }
         const fb = get('cgen-copy-feedback');
         fb.classList.add('show');
         setTimeout(function() { fb.classList.remove('show'); }, 1800);
@@ -8373,14 +10595,17 @@ Best regards`;
         get('cgen-add-tpl-title-text').textContent = 'Edit Custom Template';
         get('cgen-tpl-name').value = tpl.name || '';
         tplTypeCombo.setValue(tpl.type || '');
-        get('cgen-tpl-body').value = tpl.body || '';
-        tplCustomFieldRows = (tpl.customFields || []).map(function(field, idx) {
-          return {
-            label: field.label || '',
-            key: field.key || ('FIELD_' + idx),
-            inputType: field.inputType || 'text'
-          };
-        });
+        cgenEditor().innerHTML = cgenNormalizeTemplateHtml(tpl.body || '');
+        tplCustomFieldRows = cgenIsUluRemixTemplate(tpl)
+          ? cgenGetUluTemplateCustomFields()
+          : (tpl.customFields || []).map(function(field, idx) {
+              return {
+                label: field.label || '',
+                key: field.key || ('FIELD_' + idx),
+                inputType: field.inputType || 'text'
+              };
+            });
+        cgenRemixerRows = [cgenMakeRemixerRow('', '')];
         cgenRenderTplCustomFieldRows();
         get('cgen-add-tpl-panel').classList.remove('hidden');
       }
@@ -8432,20 +10657,26 @@ Best regards`;
         const editingId = (get('cgen-editing-tpl-id').value || '').trim();
         const name = (get('cgen-tpl-name').value || '').trim();
         const type = tplTypeCombo.getValue();
-        const body = (get('cgen-tpl-body').value || '').trim();
+        let body = cgenGetEditorHtml(cgenEditor()).trim();
         const fb = get('cgen-tpl-feedback');
         if (!name) { fb.textContent = 'Template name required.'; fb.className = 'cgen-feedback error'; return; }
         if (!type) { fb.textContent = 'Contract type required.'; fb.className = 'cgen-feedback error'; return; }
         if (!body) { fb.textContent = 'Template body required.'; fb.className = 'cgen-feedback error'; return; }
         if (!db) { fb.textContent = 'Supabase not initialised.'; fb.className = 'cgen-feedback error'; return; }
+        const isUluTemplate = name === CGEN_ULU_TEMPLATE_NAME;
+        if (isUluTemplate) {
+          body = cgenEnsureUluTemplateStructure({ name: name, body: body, customFields: [] }).body;
+        }
         const payload = {
           name: name,
           type: type,
           body: body,
-          custom_fields: tplCustomFieldRows.map(function(r, index) {
-            const label = (r.label || '').trim() || ('Field ' + (index + 1));
-            return { label: label, key: label, inputType: r.inputType || 'text' };
-          })
+          custom_fields: isUluTemplate
+            ? cgenGetUluTemplateCustomFields()
+            : tplCustomFieldRows.map(function(r, index) {
+                const label = (r.label || '').trim() || ('Field ' + (index + 1));
+                return { label: label, key: label, inputType: r.inputType || 'text' };
+              })
         };
         try {
           if (editingId) {
@@ -8485,6 +10716,15 @@ Best regards`;
           console.warn('[Doc Generator] Failed to load templates from Supabase:', err && err.message ? err.message : err);
           cgenSetTemplates([]);
         }
+	        try {
+	          await cgenEnsureUluMasterAgreementTemplateExists();
+	          await cgenEnsureSingleSongAssignmentTemplateExists();
+	          await cgenEnsureMmsExclusivePublishingAgreementTemplateExists();
+	          await cgenEnsureUluRemixAgreementType();
+	          await cgenReloadTemplates();
+	        } catch (err) {
+          console.warn('[Doc Generator] Failed to create default templates:', err && err.message ? err.message : err);
+        }
         cgenPopulateTypeSelect();
         cgenPopulateTplTypeSelect();
         cgenPopulateTemplateSelect();
@@ -8492,6 +10732,12 @@ Best regards`;
         cgenRenderCustomVarFields();
 
         get('cgen-type-select').addEventListener('change', function() {
+          const sel = get('cgen-type-select');
+          if (sel.value === CGEN_DOC_TYPE_ADD_VALUE) {
+            const next = cgenAddDocType(prompt('New Document Type name:') || '');
+            cgenPopulateTypeSelect();
+            if (next) sel.value = next;
+          }
           cgenPopulateTemplateSelect();
           cgenRenderCustomVarFields();
         });
@@ -8499,7 +10745,17 @@ Best regards`;
           cgenRenderCustomVarFields();
         });
         get('cgen-generate-btn').addEventListener('click', cgenGenerate);
-        get('cgen-copy-btn').addEventListener('click', cgenCopy);
+        get('cgen-copy-btn').addEventListener('click', function() {
+          cgenCopy();
+        });
+        get('cgen-tpl-bold-btn').addEventListener('click', function() {
+          cgenEditor().focus();
+          try {
+            document.execCommand('bold');
+          } catch (err) {
+            cgenInsertHtmlAtCursor('<strong></strong>');
+          }
+        });
         get('cgen-show-add-tpl-btn').addEventListener('click', function() {
           cgenResetTemplateForm();
           get('cgen-add-tpl-panel').classList.toggle('hidden');
