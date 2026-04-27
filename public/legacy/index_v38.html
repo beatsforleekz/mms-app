@@ -1413,6 +1413,14 @@
     }
     .cgen-input:focus, .cgen-select:focus, .cgen-textarea:focus { border-color: var(--accent); }
     .cgen-textarea { resize: vertical; }
+    #cgen-tpl-body {
+      min-height: 320px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      line-height: 1.5;
+      white-space: pre;
+      tab-size: 2;
+      overflow: auto;
+    }
 
     .cgen-section-label {
       font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -1450,7 +1458,38 @@
       min-height: 320px;
     }
     .cgen-output-preview {
-      min-height: 540px;
+      width: min(100%, 860px);
+      min-height: 1120px;
+      margin: 0 auto;
+      padding: 56px 64px;
+      border: 1px solid #d7dce5;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.08);
+      color: #111827;
+      font-size: 15px;
+      line-height: 1.58;
+      overflow: visible;
+    }
+    .cgen-output-preview p { margin: 0 0 1em; }
+    .cgen-output-preview p:last-child { margin-bottom: 0; }
+    .cgen-output-preview table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 1em;
+    }
+    .cgen-output-preview th,
+    .cgen-output-preview td {
+      border: 1px solid #111827;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .cgen-output-preview [style*="page-break-before: always"] {
+      break-before: page;
+      margin-top: 56px !important;
+      padding-top: 28px;
+      border-top: 1px dashed #d1d5db;
     }
     .cgen-rich-editor p,
     .cgen-output-preview p {
@@ -2676,12 +2715,13 @@
                 <button class="btn btn-ghost" id="cgen-tpl-bold-btn" type="button" style="font-size:12px;padding:5px 12px;"><strong>B</strong> Bold</button>
                 <span class="cgen-editor-help">Use Enter for paragraphs and Shift+Enter for line breaks. Placeholders like {{Recipient Names}} also work inside bold text.</span>
               </div>
-              <div
-                class="cgen-rich-editor"
+              <textarea
+                class="cgen-textarea"
                 id="cgen-tpl-body"
-                contenteditable="true"
-                data-placeholder="Paste or type your template here using HTML formatting. Use {{Recipient Names}}, {{Event Name}}, {{Event Date}}, {{Venue Address}}, {{Signer Name}}, {{Signer Title}} inside the template."
-              ></div>
+                rows="12"
+                spellcheck="false"
+                placeholder="Paste or type raw HTML template here. Use {{Recipient Names}}, {{Event Name}}, {{Event Date}}, {{Venue Address}}, {{Signer Name}}, {{Signer Title}}."
+              ></textarea>
             </div>
           </div>
 
@@ -2742,7 +2782,7 @@
                 <span class="cgen-copy-feedback" id="cgen-copy-feedback">Copied!</span>
               </div>
             </div>
-            <div class="cgen-output-preview" id="cgen-output" contenteditable="true"></div>
+            <div class="cgen-output-preview" id="cgen-output"></div>
           </div>
 
         </div>
@@ -9507,7 +9547,7 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
         get('cgen-add-tpl-title-text').textContent = 'Add Custom Template';
         get('cgen-tpl-name').value = '';
         tplTypeCombo.reset();
-        get('cgen-tpl-body').innerHTML = '';
+        get('cgen-tpl-body').value = '';
         tplCustomFieldRows = [];
         cgenRemixerRows = [cgenMakeRemixerRow('', '')];
         cgenRenderTplCustomFieldRows();
@@ -9564,7 +9604,7 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
 
       function cgenGetEditorHtml(el) {
         if (!el) return '';
-        return cgenNormalizeTemplateHtml(el.innerHTML || '');
+        return String(el.value || '');
       }
 
       function cgenInsertHtmlAtCursor(html) {
@@ -9642,7 +9682,6 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
         add.textContent = '+ Add Type';
         sel.appendChild(add);
         if (current && Array.from(sel.options).some(function(o) { return o.value === current; })) sel.value = current;
-        else if (!sel.value && sel.options.length > 1) sel.selectedIndex = 1;
         else sel.value = '';
       }
 
@@ -10224,10 +10263,15 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
         });
       }
 
-      function cgenPopulateTemplateSelect() {
+      function cgenPopulateTemplateSelect(preserveCurrent) {
         const type = get('cgen-type-select').value;
         const sel = get('cgen-template-select');
-        const current = sel.value;
+        const current = preserveCurrent ? sel.value : '';
+        if (!type || type === CGEN_DOC_TYPE_ADD_VALUE) {
+          sel.innerHTML = '<option value="">— select document type first —</option>';
+          sel.value = '';
+          return;
+        }
         sel.innerHTML = '<option value="">— select template —</option>';
         customTemplates.filter(function(t) { return t.type === type; }).forEach(function(t) {
           const o = document.createElement('option');
@@ -10236,11 +10280,33 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
           sel.appendChild(o);
         });
         if (current && Array.from(sel.options).some(function(o) { return o.value === current; })) sel.value = current;
+        else sel.value = '';
+      }
+
+      function cgenSetOutputPlaceholder(message) {
+        const text = String(message || '').trim();
+        if (!text) {
+          cgenOutput().innerHTML = '';
+          return;
+        }
+        cgenOutput().innerHTML = '<p style="color:var(--muted);margin:0;">' + cgenEscapeHtml(text) + '</p>';
+      }
+
+      function cgenRenderGeneratedHtml(html) {
+        cgenOutput().innerHTML = cgenNormalizeTemplateHtml(html || '');
       }
 
       function cgenRenderCustomVarFields() {
         const wrap = get('cgen-custom-var-fields');
         wrap.innerHTML = '';
+        const type = get('cgen-type-select').value;
+        if (!type || type === CGEN_DOC_TYPE_ADD_VALUE) {
+          const msg = document.createElement('div');
+          msg.className = 'cgen-field';
+          msg.innerHTML = '<div style="font-size:12px;color:var(--muted);">Select a Document Type to begin</div>';
+          wrap.appendChild(msg);
+          return;
+        }
         const tpl = cgenGetSelectedTemplate();
         if (!tpl) {
           const msg = document.createElement('div');
@@ -10334,7 +10400,7 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
 
       function cgenGenerate() {
         let body = cgenGetTemplateBody();
-        if (!body) { cgenOutput().innerHTML = '<p>No template selected.</p>'; return; }
+        if (!body) { cgenRenderGeneratedHtml('<p>No template selected.</p>'); return; }
         const tpl = cgenGetSelectedTemplate();
         const vars = {};
         const htmlVars = {};
@@ -10397,7 +10463,7 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
           htmlVars['Publisher Signature Block'] = cgenBuildSingleSongPublisherSignatureBlock();
           cgenPersistSingleSongState(tpl, { fields: cgenSingleSongFieldsState, writers: cgenSingleSongWriters });
         }
-        cgenOutput().innerHTML = cgenApplyPlaceholdersToHtml(body, vars, htmlVars);
+        cgenRenderGeneratedHtml(cgenApplyPlaceholdersToHtml(body, vars, htmlVars));
       }
 
       async function cgenEnsureUluMasterAgreementTemplateExists() {
@@ -10515,7 +10581,7 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
       async function cgenCopy() {
         const preview = cgenOutput();
         const htmlToCopy = cgenNormalizeTemplateHtml(preview.innerHTML || '');
-        const textToCopy = cgenTemplateToText(htmlToCopy);
+        const textToCopy = String(preview.innerText || preview.textContent || '').trim();
         let copied = false;
         if (navigator.clipboard && window.ClipboardItem) {
           try {
@@ -10595,7 +10661,7 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
         get('cgen-add-tpl-title-text').textContent = 'Edit Custom Template';
         get('cgen-tpl-name').value = tpl.name || '';
         tplTypeCombo.setValue(tpl.type || '');
-        cgenEditor().innerHTML = cgenNormalizeTemplateHtml(tpl.body || '');
+        cgenEditor().value = String(tpl.body || '');
         tplCustomFieldRows = cgenIsUluRemixTemplate(tpl)
           ? cgenGetUluTemplateCustomFields()
           : (tpl.customFields || []).map(function(field, idx) {
@@ -10727,9 +10793,10 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
         }
         cgenPopulateTypeSelect();
         cgenPopulateTplTypeSelect();
-        cgenPopulateTemplateSelect();
+        cgenPopulateTemplateSelect(false);
         cgenRenderSavedTpls();
         cgenRenderCustomVarFields();
+        cgenSetOutputPlaceholder('Select a Document Type to begin');
 
         get('cgen-type-select').addEventListener('change', function() {
           const sel = get('cgen-type-select');
@@ -10738,23 +10805,31 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
             cgenPopulateTypeSelect();
             if (next) sel.value = next;
           }
-          cgenPopulateTemplateSelect();
+          get('cgen-template-select').value = '';
+          cgenPopulateTemplateSelect(false);
           cgenRenderCustomVarFields();
+          if (!sel.value || sel.value === CGEN_DOC_TYPE_ADD_VALUE) cgenSetOutputPlaceholder('Select a Document Type to begin');
+          else cgenSetOutputPlaceholder('');
         });
         get('cgen-template-select').addEventListener('change', function() {
           cgenRenderCustomVarFields();
+          const tpl = cgenGetSelectedTemplate();
+          if (!tpl) cgenSetOutputPlaceholder('');
         });
         get('cgen-generate-btn').addEventListener('click', cgenGenerate);
         get('cgen-copy-btn').addEventListener('click', function() {
           cgenCopy();
         });
         get('cgen-tpl-bold-btn').addEventListener('click', function() {
-          cgenEditor().focus();
-          try {
-            document.execCommand('bold');
-          } catch (err) {
-            cgenInsertHtmlAtCursor('<strong></strong>');
-          }
+          const editor = cgenEditor();
+          if (!editor) return;
+          editor.focus();
+          const start = Number(editor.selectionStart || 0);
+          const end = Number(editor.selectionEnd || 0);
+          const raw = String(editor.value || '');
+          const selected = raw.slice(start, end);
+          const replacement = selected ? ('<strong>' + selected + '</strong>') : '<strong></strong>';
+          editor.setRangeText(replacement, start, end, 'end');
         });
         get('cgen-show-add-tpl-btn').addEventListener('click', function() {
           cgenResetTemplateForm();
