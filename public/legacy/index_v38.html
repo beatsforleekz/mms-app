@@ -1717,6 +1717,27 @@
         </div>
         <hr class="divider" />
 
+        <div class="contracts-toolbar">
+          <input class="contracts-search" id="releases-search" type="text" placeholder="Search releases…" />
+          <select id="releases-sort" class="cgen-select" style="min-width:170px;">
+            <option value="title_az">Sort: Title A → Z</option>
+            <option value="title_za">Sort: Title Z → A</option>
+            <option value="date_newest">Sort: Release Date (Newest)</option>
+            <option value="date_oldest">Sort: Release Date (Oldest)</option>
+            <option value="artist_az">Sort: Artist A → Z</option>
+            <option value="status_az">Sort: Status A → Z</option>
+          </select>
+          <select id="releases-role-filter" class="cgen-select" style="min-width:150px;">
+            <option value="all">All Roles</option>
+          </select>
+          <select id="releases-type-filter" class="cgen-select" style="min-width:140px;">
+            <option value="all">All Types</option>
+          </select>
+          <select id="releases-status-filter" class="cgen-select" style="min-width:150px;">
+            <option value="all">All Statuses</option>
+          </select>
+        </div>
+
         <div class="debug-panel" id="debug-panel">
           <div class="debug-title">🔍 Debug — Releases Fetch</div>
           <div class="debug-grid">
@@ -2202,6 +2223,21 @@
         <!-- Toolbar: search + status filters -->
         <div class="contracts-toolbar">
           <input class="contracts-search" id="contracts-search" type="text" placeholder="Search contracts…" />
+          <select id="contracts-sort" class="cgen-select" style="min-width:170px;">
+            <option value="title_az">Sort: Title A → Z</option>
+            <option value="title_za">Sort: Title Z → A</option>
+            <option value="date_sent_newest">Sort: Date Sent (Newest)</option>
+            <option value="date_sent_oldest">Sort: Date Sent (Oldest)</option>
+            <option value="date_recv_newest">Sort: Received (Newest)</option>
+            <option value="date_recv_oldest">Sort: Received (Oldest)</option>
+            <option value="status_az">Sort: Status A → Z</option>
+          </select>
+          <select id="contracts-type-filter" class="cgen-select" style="min-width:150px;">
+            <option value="all">All Types</option>
+          </select>
+          <select id="contracts-sender-filter" class="cgen-select" style="min-width:170px;">
+            <option value="all">All Sending Parties</option>
+          </select>
           <button class="btn btn-ghost" id="contracts-export-btn" type="button">Export</button>
           <button class="filter-btn active" data-status="all">All</button>
           <button class="filter-btn" data-status="Draft">Draft</button>
@@ -3096,12 +3132,17 @@
     let currentAssets       = [];
     let currentActiveArea   = 'all';
     let currentVisibleContracts = [];
+    let currentVisibleReleases = [];
     let currentVisibleActions = [];
     let currentVisiblePayees = [];
     let currentVisibleStatements = [];
     const LIST_PAGE_SIZE = 100;
     let contractsPage = 1;
     let payeesPage = 1;
+    let releasesSort = 'title_az';
+    let releasesRoleFilter = 'all';
+    let releasesTypeFilter = 'all';
+    let releasesStatusFilter = 'all';
     const selectedReleaseIds = new Set();
     const selectedContractIds = new Set();
     const selectedActionIds = new Set();
@@ -3539,6 +3580,11 @@
     const elRelTbody   = document.getElementById('releases-tbody');
     const elRelArchiveWrap = document.getElementById('releases-archive-wrap');
     const elRelArchiveTbody = document.getElementById('releases-archive-tbody');
+    const elReleasesSearch = document.getElementById('releases-search');
+    const elReleasesSort = document.getElementById('releases-sort');
+    const elReleasesRoleFilter = document.getElementById('releases-role-filter');
+    const elReleasesTypeFilter = document.getElementById('releases-type-filter');
+    const elReleasesStatusFilter = document.getElementById('releases-status-filter');
 
     const dbg = {
       set(id,t,c){ const el=document.getElementById(id); if(!el)return; el.textContent=t; el.className='debug-value'+(c?' '+c:''); },
@@ -3550,6 +3596,59 @@
     function relShowLoading(msg){ elRelLoading.textContent=msg||'Loading releases…'; elRelLoading.style.display='block'; elRelError.style.display=elRelEmpty.style.display='none'; elRelWrap.style.display='none'; if (elRelArchiveWrap) elRelArchiveWrap.style.display='none'; dbg.fetchStatus('Fetching…','debug-warn'); dbg.rowCount('—'); dbg.fetchError(''); }
     function relShowError(msg) { elRelLoading.style.display='none'; elRelError.textContent='⚠ '+msg; elRelError.style.display='block'; elRelEmpty.style.display=elRelWrap.style.display='none'; if (elRelArchiveWrap) elRelArchiveWrap.style.display='none'; dbg.fetchStatus('Error','debug-error'); dbg.rowCount('—'); dbg.fetchError(msg); }
     function relShowEmpty()    { elRelLoading.style.display=elRelError.style.display='none'; elRelEmpty.style.display='flex'; elRelWrap.style.display='none'; dbg.fetchStatus('Success — 0 rows','debug-warn'); dbg.rowCount('0'); dbg.fetchError(''); }
+
+    function populateReleaseLogicalFilters(rows) {
+      if (!elReleasesRoleFilter || !elReleasesTypeFilter || !elReleasesStatusFilter) return;
+      const source = Array.isArray(rows) ? rows : [];
+      const roleCurrent = releasesRoleFilter;
+      const typeCurrent = releasesTypeFilter;
+      const statusCurrent = releasesStatusFilter;
+      const roleVals = Array.from(new Set(source.map(function(r) {
+        return String(r && r.company_role || '').trim();
+      }).filter(Boolean))).sort(function(a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
+      const typeVals = Array.from(new Set(source.map(function(r) {
+        return String(r && r.type || '').trim();
+      }).filter(Boolean))).sort(function(a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
+      const statusVals = Array.from(new Set(source.map(function(r) {
+        return String(r && r.status || '').trim();
+      }).filter(Boolean))).sort(function(a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
+
+      elReleasesRoleFilter.innerHTML = '<option value="all">All Roles</option>';
+      roleVals.forEach(function(val) {
+        const o = document.createElement('option');
+        o.value = val;
+        o.textContent = val;
+        elReleasesRoleFilter.appendChild(o);
+      });
+      elReleasesRoleFilter.value = roleVals.indexOf(roleCurrent) >= 0 ? roleCurrent : 'all';
+      releasesRoleFilter = elReleasesRoleFilter.value;
+
+      elReleasesTypeFilter.innerHTML = '<option value="all">All Types</option>';
+      typeVals.forEach(function(val) {
+        const o = document.createElement('option');
+        o.value = val;
+        o.textContent = val;
+        elReleasesTypeFilter.appendChild(o);
+      });
+      elReleasesTypeFilter.value = typeVals.indexOf(typeCurrent) >= 0 ? typeCurrent : 'all';
+      releasesTypeFilter = elReleasesTypeFilter.value;
+
+      elReleasesStatusFilter.innerHTML = '<option value="all">All Statuses</option>';
+      statusVals.forEach(function(val) {
+        const o = document.createElement('option');
+        o.value = val;
+        o.textContent = val;
+        elReleasesStatusFilter.appendChild(o);
+      });
+      elReleasesStatusFilter.value = statusVals.indexOf(statusCurrent) >= 0 ? statusCurrent : 'all';
+      releasesStatusFilter = elReleasesStatusFilter.value;
+    }
 
     function isManualPipelineStatus(status) {
       const normalized = String(status || '').toLowerCase().trim();
@@ -3829,13 +3928,58 @@
           row.raw_status = entry.status || 'New';
           return row;
         });
-        const activeRows = pipelineRows.filter(function(row) { return !row.manual_status; });
-        const archiveRows = pipelineRows.filter(function(row) { return !!row.manual_status; });
+        populateReleaseLogicalFilters(pipelineRows);
+        const releaseSearchTerm = String((elReleasesSearch && elReleasesSearch.value) || '').toLowerCase();
+        const visibleRows = pipelineRows.filter(function(row) {
+          if (releasesRoleFilter !== 'all' && String(row.company_role || '').trim() !== releasesRoleFilter) return false;
+          if (releasesTypeFilter !== 'all' && String(row.type || '').trim() !== releasesTypeFilter) return false;
+          if (releasesStatusFilter !== 'all' && String(row.status || '').trim() !== releasesStatusFilter) return false;
+          if (releaseSearchTerm) {
+            const hay = [
+              row.internal_id || '',
+              row.title || '',
+              row.artist || '',
+              row.type || '',
+              row.company_role || '',
+              row.status || '',
+              row.owner || '',
+              row.notes || ''
+            ].join(' ').toLowerCase();
+            if (!hay.includes(releaseSearchTerm)) return false;
+          }
+          return true;
+        });
+        const sortRows = function(rows) {
+          const list = (rows || []).slice();
+          list.sort(function(a, b) {
+            function cmpText(av, bv) {
+              return String(av || '').localeCompare(String(bv || ''), undefined, { sensitivity: 'base' });
+            }
+            function cmpDate(av, bv) {
+              const at = av ? new Date(av).getTime() : 0;
+              const bt = bv ? new Date(bv).getTime() : 0;
+              return at - bt;
+            }
+            switch (releasesSort) {
+              case 'title_za': return -cmpText(a.title, b.title);
+              case 'date_newest': return -cmpDate(a.release_date, b.release_date);
+              case 'date_oldest': return cmpDate(a.release_date, b.release_date);
+              case 'artist_az': return cmpText(a.artist, b.artist);
+              case 'status_az': return cmpText(a.status, b.status);
+              case 'title_az':
+              default: return cmpText(a.title, b.title);
+            }
+          });
+          return list;
+        };
+        const activeRows = sortRows(visibleRows.filter(function(row) { return !row.manual_status; }));
+        const archiveRows = sortRows(visibleRows.filter(function(row) { return !!row.manual_status; }));
         dbg.fetchStatus('Loaded from catalogue references','debug-ok');
         dbg.rowCount(String(pipelineRows.length), pipelineRows.length>0?'debug-ok':'debug-warn');
         dbg.fetchError('');
 
         if (!pipelineRows.length) {
+          currentVisibleReleases = [];
           updateBulkBar('releases-bulk-bar', 'releases-bulk-count', selectedReleaseIds);
           syncSelectAllCheckbox([], selectedReleaseIds, 'releases-select-all');
           if (elRelArchiveWrap) elRelArchiveWrap.style.display = 'none';
@@ -3900,7 +4044,7 @@
               if (e.target.checked) selectedReleaseIds.add(releaseIdStr);
               else selectedReleaseIds.delete(releaseIdStr);
               updateBulkBar('releases-bulk-bar', 'releases-bulk-count', selectedReleaseIds);
-              syncSelectAllCheckbox(activeRows.map(function(item) { return item.id; }), selectedReleaseIds, 'releases-select-all');
+              syncSelectAllCheckbox(currentVisibleReleases.map(function(item) { return item.id; }), selectedReleaseIds, 'releases-select-all');
             });
           }
 
@@ -3952,11 +4096,12 @@
         });
         }
 
+        currentVisibleReleases = activeRows.slice();
         renderPipelineRows(elRelTbody, activeRows, false);
         renderPipelineRows(elRelArchiveTbody, archiveRows, true);
 
         updateBulkBar('releases-bulk-bar', 'releases-bulk-count', selectedReleaseIds);
-        syncSelectAllCheckbox(activeRows.map(function(item) { return item.id; }), selectedReleaseIds, 'releases-select-all');
+        syncSelectAllCheckbox(currentVisibleReleases.map(function(item) { return item.id; }), selectedReleaseIds, 'releases-select-all');
 
         elRelLoading.style.display = 'none';
         elRelEmpty.style.display = activeRows.length ? 'none' : 'flex';
@@ -4591,6 +4736,9 @@
     const elContractsFormPanel = document.getElementById('contract-form-panel');
     const elContractsFeedback  = document.getElementById('contract-feedback');
     const elContractSearch     = document.getElementById('contracts-search');
+    const elContractsSort      = document.getElementById('contracts-sort');
+    const elContractsTypeFilter = document.getElementById('contracts-type-filter');
+    const elContractsSenderFilter = document.getElementById('contracts-sender-filter');
 
     // Form field refs
     const cfTitle       = document.getElementById('cf-title');
@@ -4848,6 +4996,9 @@
 
     let allContracts = [];
     let contractsFilter = 'all';
+    let contractsSort = 'title_az';
+    let contractsTypeFilter = 'all';
+    let contractsSenderFilter = 'all';
     let contractCatalogueOptions = [];
     let contractCatalogueLinksMap = {};
     let currentContractCatalogueLinks = [];
@@ -5184,6 +5335,7 @@
         elContractsLoading.style.display = 'none';
         // Fetch contract_payees to populate the Parties/Payees column from DB
         await fetchContractPayeesMap();
+        populateContractsLogicalFilters();
         renderContractsTable();
         if (typeof refreshPipelineAssetCells === 'function') refreshPipelineAssetCells();
         if (typeof renderDashboard === 'function') renderDashboard();
@@ -5294,10 +5446,48 @@
       return c && c.release_id ? (releaseTitleForId(c.release_id) || String(c.release_id)) : '';
     }
 
+    function populateContractsLogicalFilters() {
+      if (!elContractsTypeFilter || !elContractsSenderFilter) return;
+      const typeCurrent = contractsTypeFilter;
+      const senderCurrent = contractsSenderFilter;
+      const types = Array.from(new Set((allContracts || []).map(function(c) {
+        return String(c && c.contract_type || '').trim();
+      }).filter(Boolean))).sort(function(a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
+      const senders = Array.from(new Set((allContracts || []).map(function(c) {
+        return String(c && c.sending_party || '').trim();
+      }).filter(Boolean))).sort(function(a, b) {
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
+
+      elContractsTypeFilter.innerHTML = '<option value="all">All Types</option>';
+      types.forEach(function(type) {
+        const o = document.createElement('option');
+        o.value = type;
+        o.textContent = type;
+        elContractsTypeFilter.appendChild(o);
+      });
+      elContractsTypeFilter.value = types.indexOf(typeCurrent) >= 0 ? typeCurrent : 'all';
+      contractsTypeFilter = elContractsTypeFilter.value;
+
+      elContractsSenderFilter.innerHTML = '<option value="all">All Sending Parties</option>';
+      senders.forEach(function(sender) {
+        const o = document.createElement('option');
+        o.value = sender;
+        o.textContent = sender;
+        elContractsSenderFilter.appendChild(o);
+      });
+      elContractsSenderFilter.value = senders.indexOf(senderCurrent) >= 0 ? senderCurrent : 'all';
+      contractsSenderFilter = elContractsSenderFilter.value;
+    }
+
     function renderContractsTable() {
       const searchTerm = (elContractSearch.value || '').toLowerCase();
       const rows = allContracts.filter(function(c) {
         if (contractsFilter !== 'all' && (c.status||'').toLowerCase() !== contractsFilter.toLowerCase()) return false;
+        if (contractsTypeFilter !== 'all' && String(c.contract_type || '').trim() !== contractsTypeFilter) return false;
+        if (contractsSenderFilter !== 'all' && String(c.sending_party || '').trim() !== contractsSenderFilter) return false;
         if (searchTerm) {
           const hay = [
             c.title || '',
@@ -5314,9 +5504,24 @@
         return true;
       });
       rows.sort(function(a, b) {
-        return String(a.title || '').localeCompare(String(b.title || ''), undefined, {
-          sensitivity: 'base'
-        });
+        function cmpText(av, bv) {
+          return String(av || '').localeCompare(String(bv || ''), undefined, { sensitivity: 'base' });
+        }
+        function cmpDate(av, bv) {
+          const at = av ? new Date(av).getTime() : 0;
+          const bt = bv ? new Date(bv).getTime() : 0;
+          return at - bt;
+        }
+        switch (contractsSort) {
+          case 'title_za': return -cmpText(a.title, b.title);
+          case 'date_sent_newest': return -cmpDate(a.date_sent, b.date_sent);
+          case 'date_sent_oldest': return cmpDate(a.date_sent, b.date_sent);
+          case 'date_recv_newest': return -cmpDate(a.date_received, b.date_received);
+          case 'date_recv_oldest': return cmpDate(a.date_received, b.date_received);
+          case 'status_az': return cmpText(a.status, b.status);
+          case 'title_az':
+          default: return cmpText(a.title, b.title);
+        }
       });
       const pagination = paginateRows(rows, contractsPage, LIST_PAGE_SIZE);
       contractsPage = pagination.page;
@@ -5478,6 +5683,27 @@
     document.getElementById('contracts-add-btn').addEventListener('click', function() { resetContractForm(); showContractForm(); });
     document.getElementById('contract-cancel-btn').addEventListener('click', hideContractForm);
     elContractSearch.addEventListener('input', function() { contractsPage = 1; renderContractsTable(); });
+    if (elContractsSort) {
+      elContractsSort.addEventListener('change', function() {
+        contractsSort = elContractsSort.value || 'title_az';
+        contractsPage = 1;
+        renderContractsTable();
+      });
+    }
+    if (elContractsTypeFilter) {
+      elContractsTypeFilter.addEventListener('change', function() {
+        contractsTypeFilter = elContractsTypeFilter.value || 'all';
+        contractsPage = 1;
+        renderContractsTable();
+      });
+    }
+    if (elContractsSenderFilter) {
+      elContractsSenderFilter.addEventListener('change', function() {
+        contractsSenderFilter = elContractsSenderFilter.value || 'all';
+        contractsPage = 1;
+        renderContractsTable();
+      });
+    }
     if (cfReleaseSearch) {
       cfReleaseSearch.addEventListener('focus', async function() {
         try {
@@ -5794,6 +6020,35 @@
     const elReleasesNewBtn = document.getElementById('releases-new-btn');
     if (elReleasesNewBtn) {
       elReleasesNewBtn.addEventListener('click', openNewRelease);
+    }
+    if (elReleasesSearch) {
+      elReleasesSearch.addEventListener('input', function() {
+        fetchReleases();
+      });
+    }
+    if (elReleasesSort) {
+      elReleasesSort.addEventListener('change', function() {
+        releasesSort = elReleasesSort.value || 'title_az';
+        fetchReleases();
+      });
+    }
+    if (elReleasesRoleFilter) {
+      elReleasesRoleFilter.addEventListener('change', function() {
+        releasesRoleFilter = elReleasesRoleFilter.value || 'all';
+        fetchReleases();
+      });
+    }
+    if (elReleasesTypeFilter) {
+      elReleasesTypeFilter.addEventListener('change', function() {
+        releasesTypeFilter = elReleasesTypeFilter.value || 'all';
+        fetchReleases();
+      });
+    }
+    if (elReleasesStatusFilter) {
+      elReleasesStatusFilter.addEventListener('change', function() {
+        releasesStatusFilter = elReleasesStatusFilter.value || 'all';
+        fetchReleases();
+      });
     }
     if (document.getElementById('release-start-close')) document.getElementById('release-start-close').addEventListener('click', closeReleaseStartPanel);
     if (document.getElementById('release-start-cancel-btn')) document.getElementById('release-start-cancel-btn').addEventListener('click', closeReleaseStartPanel);
@@ -6504,7 +6759,7 @@
         });
       };
 
-      wireSelectAll('releases-select-all', function() { return currentReleasesData.map(function(r) { return r.id; }); }, selectedReleaseIds, function() { fetchReleases(); });
+      wireSelectAll('releases-select-all', function() { return currentVisibleReleases.map(function(r) { return r.id; }); }, selectedReleaseIds, function() { fetchReleases(); });
       wireClear('releases-clear-selection-btn', selectedReleaseIds, function() { fetchReleases(); });
       const relDel = document.getElementById('releases-delete-selected-btn');
       if (relDel) relDel.addEventListener('click', async function() {
