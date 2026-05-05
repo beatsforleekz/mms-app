@@ -342,6 +342,10 @@
     .release-selector-bar label { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; }
     .release-selector-bar select { flex: 1; max-width: 340px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; color: var(--text); background: var(--surface); outline: none; transition: border-color .12s; }
     .release-selector-bar select:focus { border-color: var(--accent); }
+    .release-dropbox-bar { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; margin-bottom: var(--gap); }
+    .release-dropbox-bar label { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; }
+    .release-dropbox-bar input[type="url"] { flex: 1; width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; color: var(--text); background: var(--surface); outline: none; transition: border-color .12s; }
+    .release-dropbox-bar input[type="url"]:focus { border-color: var(--accent); }
 
     .checklist-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 14px; }
 
@@ -353,7 +357,7 @@
     /* Shared column header strip inside each group */
     .checklist-col-header {
       display: grid;
-      grid-template-columns: 200px 1fr 80px 80px 54px;
+      grid-template-columns: 1fr 80px 80px 54px;
       background: var(--bg);
       border-bottom: 1px solid var(--border);
     }
@@ -377,12 +381,6 @@
     .checklist-cell.asset-name input[type="text"]:focus { border-color: var(--accent); background: var(--surface); font-weight: 500; }
     .checklist-cell.asset-name input[type="text"]::placeholder { color: #bbb; font-weight: 400; }
     .checklist-row.not-required .checklist-cell.asset-name input[type="text"] { color: var(--muted); font-weight: 400; }
-    .checklist-cell.asset-dropbox { border-right: 1px solid var(--border); }
-    .checklist-cell.asset-dropbox input { width: 100%; padding: 4px 8px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; color: var(--text); background: transparent; outline: none; transition: border-color .12s, background .12s; }
-    .checklist-cell.asset-dropbox input:hover { border-color: var(--border); background: var(--bg); }
-    .checklist-cell.asset-dropbox input:focus { border-color: var(--accent); background: var(--surface); }
-    .checklist-cell.asset-dropbox input::placeholder { color: #bbb; }
-
     .checklist-cell.asset-received,
     .checklist-cell.asset-required { border-right: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
     .checklist-cell.asset-received input[type="checkbox"],
@@ -419,7 +417,7 @@
     /* Make checklist-row a block container so the error can break to a new "row" */
     .checklist-row {
       display: grid;
-      grid-template-columns: 200px 1fr 80px 80px 54px;
+      grid-template-columns: 1fr 80px 80px 54px;
       grid-template-rows: auto auto;       /* row + optional error bar */
       align-items: center;
       border-bottom: 1px solid var(--border);
@@ -433,7 +431,7 @@
     /* Add custom row form strip at the bottom of each group */
     .add-row-strip {
       display: grid;
-      grid-template-columns: 200px 1fr 80px 80px 54px;
+      grid-template-columns: 1fr 80px 80px 54px;
       align-items: center;
       border-top: 1px dashed var(--border);
       background: #fafeff;
@@ -448,14 +446,6 @@
     }
     .add-row-strip .add-title-input:focus { border-color: var(--accent); }
     .add-row-strip .add-title-input::placeholder { color: #bbb; }
-    .add-row-strip .add-url-input {
-      padding: 5px 8px; margin: 6px 8px;
-      border: 1px solid var(--border); border-radius: 4px;
-      font-size: 12px; color: var(--text); background: var(--surface);
-      outline: none; width: calc(100% - 16px);
-    }
-    .add-row-strip .add-url-input:focus { border-color: var(--accent); }
-    .add-row-strip .add-url-input::placeholder { color: #bbb; }
     .add-row-strip .add-cell-center { display: flex; align-items: center; justify-content: center; }
     .add-row-strip .add-cell-center input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
     .add-row-strip .add-cell-btn { display: flex; align-items: center; justify-content: center; }
@@ -1627,7 +1617,7 @@
       <button class="nav-btn" data-section="releases"><span class="icon">⎇</span> Release Pipeline</button>
       <button class="nav-btn" data-section="assets"><span class="icon">◈</span> Assets Checklist</button>
       <button class="nav-btn" data-section="contracts"><span class="icon">◻</span> Contracts</button>
-      <button class="nav-btn" data-section="payees"><span class="icon">👤</span> Payees</button>
+      <button class="nav-btn" data-section="payees" style="display:none;"><span class="icon">👤</span> Payees</button>
       <button class="nav-btn" data-section="actions"><span class="icon">✓</span> Actions</button>
       <button class="nav-btn" data-section="statements"><span class="icon">$</span> Statements</button>
       <button class="nav-btn" data-section="contract-generator"><span class="icon">✍</span> Doc Generator</button>
@@ -1764,6 +1754,23 @@
             <div class="release-edit-field full">
               <label class="release-edit-label" for="release-start-search">Search Catalogue</label>
               <input class="release-edit-input" id="release-start-search" type="text" placeholder="Type artist, title, writer, or work…" />
+            </div>
+            <div class="release-edit-field">
+              <label class="release-edit-label" for="release-start-type-filter">Catalogue Filter</label>
+              <select class="release-edit-select" id="release-start-type-filter">
+                <option value="all">All Catalogues</option>
+                <option value="label">Label Catalogue (Artist + Track Title)</option>
+                <option value="publishing">Publishing Catalogue (Writers + Work Title)</option>
+              </select>
+            </div>
+            <div class="release-edit-field">
+              <label class="release-edit-label" for="release-start-sort">Sort Field (clear field target)</label>
+              <select class="release-edit-select" id="release-start-sort">
+                <option value="artist_az">Artist / Writer A → Z</option>
+                <option value="artist_za">Artist / Writer Z → A</option>
+                <option value="track_az">Track / Work Title A → Z</option>
+                <option value="track_za">Track / Work Title Z → A</option>
+              </select>
             </div>
             <div class="release-edit-field full">
               <div id="release-start-results" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto;"></div>
@@ -1970,6 +1977,11 @@
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-left:auto;"><input type="checkbox" id="assets-select-all" style="accent-color:var(--accent);" /> Select All Visible</label>
           <button class="btn btn-primary" id="assets-save-all-btn" type="button">Save Checklist</button>
         </div>
+        <div class="release-dropbox-bar">
+          <label for="assets-release-dropbox">Release Dropbox Link</label>
+          <input id="assets-release-dropbox" type="url" placeholder="Paste release folder Dropbox link…" />
+          <a id="assets-release-dropbox-open" class="btn btn-ghost" href="#" target="_blank" rel="noopener noreferrer" style="display:none; font-size:12px; padding:6px 10px;">Open Folder</a>
+        </div>
         <div class="bulk-bar" id="assets-bulk-bar">
           <span class="bulk-count" id="assets-bulk-count">0 selected</span>
           <div class="bulk-actions">
@@ -2026,12 +2038,12 @@
 
           <!-- ── v36e Debug Panel (Contracts only) ── -->
           <div id="contract-debug-panel" style="display:none;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.7;">
-            <div style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e;margin-bottom:6px;font-size:11px;">🔍 Debug — Contract / Payees</div>
+          <div style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#92400e;margin-bottom:6px;font-size:11px;">🔍 Debug — Contract / Receiving Parties</div>
             <div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;">
               <span style="color:#78350f;font-weight:600;">Eddy visible:</span><span id="dbg-eddy-visible" style="font-family:monospace;">—</span>
               <span style="color:#78350f;font-weight:600;">Contract type:</span><span id="dbg-contract-type" style="font-family:monospace;">—</span>
-              <span style="color:#78350f;font-weight:600;">Contract payees loaded:</span><span id="dbg-cp-count" style="font-family:monospace;">—</span>
-              <span style="color:#78350f;font-weight:600;">Parties/Payees source:</span><span id="dbg-pp-source" style="font-family:monospace;">—</span>
+              <span style="color:#78350f;font-weight:600;">Contract receiving parties loaded:</span><span id="dbg-cp-count" style="font-family:monospace;">—</span>
+              <span style="color:#78350f;font-weight:600;">Parties/Receiving Parties source:</span><span id="dbg-pp-source" style="font-family:monospace;">—</span>
               <span style="color:#78350f;font-weight:600;">contractPayeesMap rows:</span><span id="dbg-map-rows" style="font-family:monospace;">—</span>
             </div>
           </div>
@@ -2133,26 +2145,26 @@
 
           </div>
 
-          <!-- ── Contract Payees (v36d) — DB-backed, select or create, with share % ── -->
+          <!-- ── Contract Receiving Parties (v36d) — DB-backed, select or create, with share % ── -->
           <div class="contract-payees-section">
-            <div class="contract-payees-title">Contract Payees &amp; Shares</div>
+            <div class="contract-payees-title">Receiving Parties &amp; Shares</div>
 
             <!-- Add row: select existing or create new inline -->
             <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
               <select class="cp-payee-select" id="cp-existing-select" style="flex:1;min-width:160px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);outline:none;">
-                <option value="">— Select existing payee —</option>
+                <option value="">— Select existing receiving party —</option>
               </select>
               <span style="font-size:12px;color:var(--muted);">or</span>
-              <input type="text" id="cp-add-name" placeholder="New payee name…" style="flex:1;min-width:140px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);outline:none;" />
+              <input type="text" id="cp-add-name" placeholder="New receiving party name…" style="flex:1;min-width:140px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);outline:none;" />
               <input type="email" id="cp-add-email" placeholder="Email (optional)" style="min-width:150px;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--surface);color:var(--text);outline:none;" />
-              <button class="btn btn-ghost" id="cp-add-btn" type="button" style="font-size:12px;padding:6px 12px;white-space:nowrap;">+ Add Payee</button>
+              <button class="btn btn-ghost" id="cp-add-btn" type="button" style="font-size:12px;padding:6px 12px;white-space:nowrap;">+ Add Receiving Party</button>
             </div>
 
-            <!-- Payees list for this contract (name + share %) -->
+            <!-- Receiving parties list for this contract (name + share %) -->
             <div id="contract-payees-list">
-              <div style="font-size:12px;color:var(--muted);font-style:italic;padding:6px 0;" id="contract-payees-empty">No payees added yet.</div>
+              <div style="font-size:12px;color:var(--muted);font-style:italic;padding:6px 0;" id="contract-payees-empty">No receiving parties added yet.</div>
             </div>
-            <div style="font-size:11px;color:#0369a1;margin-top:6px;" id="cp-sync-hint">Payees added here will pre-populate the Eddy calculator (shown for Master / Remix / Producer contracts).</div>
+            <div style="font-size:11px;color:#0369a1;margin-top:6px;" id="cp-sync-hint">Receiving parties added here will pre-populate the Eddy calculator (shown for Master / Remix / Producer contracts).</div>
           </div>
 
           <!-- ── Eddy Share Calculator (v24) ───────────────────────────────────
@@ -2163,7 +2175,7 @@
             <div class="eddy-calc-title">
               ◈ Eddy Share Calculator
               <span style="font-size:10px; font-weight:400; color:#0369a1; text-transform:none; letter-spacing:0;">
-                — enter Payee Split % directly into Eddy; Effective % is reference only
+                — enter Receiving Party Split % directly into Eddy; Effective % is reference only
               </span>
             </div>
 
@@ -2180,7 +2192,7 @@
               <table class="payee-table">
                 <thead>
                   <tr>
-                    <th style="width:180px;">Payee Name</th>
+                    <th style="width:180px;">Receiving Party Name</th>
                     <th style="width:180px;">Email (optional)</th>
                     <th class="eddy-col" style="width:120px;">Split % of artist share<br><span style="font-weight:400;font-size:9px;text-transform:none;letter-spacing:0;color:#0ea5e9;">→ enter this in Eddy</span></th>
                     <th style="width:130px;">Effective % of total revenue<br><span style="font-weight:400;font-size:9px;text-transform:none;letter-spacing:0;">(reference only)</span></th>
@@ -2191,12 +2203,12 @@
               </table>
             </div>
 
-            <!-- Add payee -->
+            <!-- Add receiving party -->
             <div class="payee-add-row">
-              <input type="text" id="payee-add-name" placeholder="Payee name…" />
+              <input type="text" id="payee-add-name" placeholder="Receiving party name…" />
               <input type="email" id="payee-add-email" placeholder="Email (optional)" style="max-width:180px;" />
               <input type="number" id="payee-add-split" placeholder="Split %" min="0" max="100" step="0.01" style="max-width:90px;" />
-              <button class="payee-add-btn" id="payee-add-btn" type="button">+ Add Payee</button>
+              <button class="payee-add-btn" id="payee-add-btn" type="button">+ Add Receiving Party</button>
             </div>
 
             <!-- Split total -->
@@ -2281,7 +2293,7 @@
                 <th>Release</th>
                 <th>Status</th>
                 <th>Sending Party</th>
-                <th>Parties / Payees</th>
+                <th>Parties / Receiving Parties</th>
                 <th style="color:#0369a1;">Artist Share</th>
                 <th>Date Sent</th>
                 <th>Received</th>
@@ -2459,7 +2471,7 @@
       </section>
 
       <!-- PAYEES MODULE -->
-      <section id="section-payees" class="section">
+      <section id="section-payees" class="section" style="display:none !important;">
         <div class="section-header">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;">
             <div><h2>Payees</h2><p>All payees. Reusable across contracts. Add a payee here or create one inline from a contract.</p></div>
@@ -4131,6 +4143,8 @@
     const elAssetsPlaceholder   = document.getElementById('assets-placeholder');
     const elAssetsChecklist     = document.getElementById('assets-checklist');
     const elAssetsSaveAllBtn    = document.getElementById('assets-save-all-btn');
+    const elAssetsReleaseDropbox = document.getElementById('assets-release-dropbox');
+    const elAssetsReleaseDropboxOpen = document.getElementById('assets-release-dropbox-open');
 
     const dbgA = {
       set(id,t,c){ const el=document.getElementById(id); if(!el)return; el.textContent=t; el.className='debug-value'+(c?' '+c:''); },
@@ -4163,11 +4177,78 @@
     // releaseIdMap: maps String(option.value) → the exact release.id from Supabase
     // Used to verify and retrieve the correct UUID/id before saving.
     const releaseIdMap = {};
+    let currentReleaseDropboxLink = '';
+    let releaseDropboxStorageField = null;
+
+    function setAssetsReleaseDropboxUi(value) {
+      const url = String(value || '').trim();
+      currentReleaseDropboxLink = url;
+      if (elAssetsReleaseDropbox) elAssetsReleaseDropbox.value = url;
+      if (!elAssetsReleaseDropboxOpen) return;
+      if (url) {
+        elAssetsReleaseDropboxOpen.href = url;
+        elAssetsReleaseDropboxOpen.style.display = 'inline-flex';
+      } else {
+        elAssetsReleaseDropboxOpen.href = '#';
+        elAssetsReleaseDropboxOpen.style.display = 'none';
+      }
+    }
+
+    async function detectReleaseDropboxStorageField() {
+      if (releaseDropboxStorageField !== null) return releaseDropboxStorageField;
+      if (!db) {
+        releaseDropboxStorageField = '';
+        return releaseDropboxStorageField;
+      }
+      const candidates = ['dropbox_url', 'dropbox_link', 'folder_link', 'release_folder_url'];
+      for (let i = 0; i < candidates.length; i++) {
+        const field = candidates[i];
+        try {
+          const { error } = await db.from('releases').select('id,' + field).limit(1);
+          if (!error) {
+            releaseDropboxStorageField = field;
+            return releaseDropboxStorageField;
+          }
+        } catch (err) {}
+      }
+      // TODO: add releases.dropbox_url when release-level Dropbox folder storage is introduced.
+      releaseDropboxStorageField = '';
+      return releaseDropboxStorageField;
+    }
+
+    async function loadReleaseDropboxLink(releaseId) {
+      const rid = String(releaseId || '');
+      if (!rid) return '';
+      const field = await detectReleaseDropboxStorageField();
+      if (field && db) {
+        try {
+          const { data, error } = await db.from('releases').select(field).eq('id', rid).maybeSingle();
+          if (!error) return String((data && data[field]) || '').trim();
+        } catch (err) {}
+      }
+      const meta = getReleaseMeta(rid);
+      return String((meta && meta.assets_release_dropbox_url) || '').trim();
+    }
+
+    async function saveReleaseDropboxLink(releaseId, url) {
+      const rid = String(releaseId || '');
+      if (!rid) return;
+      const clean = String(url || '').trim();
+      const field = await detectReleaseDropboxStorageField();
+      if (field && db) {
+        try {
+          await db.from('releases').update({ [field]: clean || null }).eq('id', rid);
+        } catch (err) {}
+      }
+      saveReleaseMeta(rid, { assets_release_dropbox_url: clean || null });
+    }
 
     function populateAssetsReleaseDropdown(releasesData) {
       const selected = elAssetsReleaseSelect.value;
       while (elAssetsReleaseSelect.options.length > 1) elAssetsReleaseSelect.remove(1);
-      (releasesData||[]).forEach(function(r) {
+      (releasesData||[]).slice().sort(function(a, b) {
+        return String(pipelineDisplayName(a) || '').localeCompare(String(pipelineDisplayName(b) || ''), undefined, { sensitivity: 'base' });
+      }).forEach(function(r) {
         // Store the exact id value (UUID or bigint string) in the map
         releaseIdMap[String(r.id)] = r.id;
         const opt = document.createElement('option');
@@ -4237,7 +4318,7 @@
     // v19 fix: release_id is passed directly as the value from the <select> option,
     // which is exactly what was returned by Supabase in releases.id (UUID or bigint).
     // We never parseInt() it — that would corrupt a UUID to NaN.
-    async function upsertAsset(releaseId, area, assetTitle, dropboxUrl, received, required, sortOrder, existingId) {
+    async function upsertAsset(releaseId, area, assetTitle, received, required, sortOrder, existingId) {
       if (!db) throw new Error('Supabase not initialised');
       if (!releaseId) throw new Error('release_id is empty — select a release first');
 
@@ -4248,7 +4329,6 @@
         release_id:  releaseId,
         area:        area,
         asset_title: assetTitle,
-        dropbox_url: dropboxUrl || null,
         received:    !!received,
         required:    required !== false,
         sort_order:  sortOrder || null,
@@ -4327,7 +4407,6 @@
       const dbId      = existing ? existing.id : null;
       const isReq     = existing ? existing.required !== false : true;
       const isRecv    = !!(existing && existing.received === true);
-      const url       = (existing && existing.dropbox_url) || '';
       const sortOrder = (existing && existing.sort_order != null ? existing.sort_order : defaultSort) || null;
       const displayTitle = (existing && existing.asset_title) ? existing.asset_title : assetTitle;
 
@@ -4358,12 +4437,6 @@
       nameInput.placeholder = 'Asset name…';
       nameCell.appendChild(nameInput);
 
-      const dropboxCell = document.createElement('div');
-      dropboxCell.className = 'checklist-cell asset-dropbox';
-      const urlInput = document.createElement('input');
-      urlInput.type = 'url'; urlInput.placeholder = 'Dropbox link…'; urlInput.value = url;
-      dropboxCell.appendChild(urlInput);
-
       const recvCell = document.createElement('div');
       recvCell.className = 'checklist-cell asset-received';
       const recvChk = document.createElement('input');
@@ -4386,7 +4459,7 @@
 
       const rowErrorEl = document.createElement('div');
       rowErrorEl.className = 'row-error';
-      row.append(nameCell, dropboxCell, recvCell, reqCell, delCell, rowErrorEl);
+      row.append(nameCell, recvCell, reqCell, delCell, rowErrorEl);
 
       function showRowError(msg) {
         rowErrorEl.textContent = msg;
@@ -4398,7 +4471,7 @@
         rowErrorEl.classList.remove('visible');
       }
 
-      [nameInput, urlInput].forEach(function(el) {
+      [nameInput].forEach(function(el) {
         el.addEventListener('input', function() { clearRowError(); });
       });
       recvChk.addEventListener('change', function() { refreshGroupProgressFromDOM(group); });
@@ -4424,7 +4497,6 @@
             delete row.dataset.assetId;
             selectedAssetKeys.delete(selectionKey);
             nameInput.value = assetTitle;
-            urlInput.value = '';
             recvChk.checked = false;
             reqChk.checked = true;
             row.classList.remove('not-required');
@@ -4461,15 +4533,6 @@
       titleInput.placeholder = '+ Asset title…';
       titleWrap.appendChild(titleInput);
 
-      // URL input
-      const urlWrap = document.createElement('div');
-      urlWrap.style.padding = '0';
-      const urlInput = document.createElement('input');
-      urlInput.type = 'url';
-      urlInput.className = 'add-url-input';
-      urlInput.placeholder = 'Dropbox link (optional)';
-      urlWrap.appendChild(urlInput);
-
       // Received checkbox
       const recvWrap = document.createElement('div');
       recvWrap.className = 'add-cell-center';
@@ -4491,7 +4554,7 @@
       addBtn.className = 'add-asset-btn'; addBtn.textContent = '+ Add';
       btnWrap.appendChild(addBtn);
 
-      strip.append(titleWrap, urlWrap, recvWrap, reqWrap, btnWrap);
+      strip.append(titleWrap, recvWrap, reqWrap, btnWrap);
 
       // v18: error bar for the add-row form — inserted as a sibling after the strip
       // (created lazily so it only appears when needed)
@@ -4520,14 +4583,13 @@
         const pseudo = {
           id: null,
           asset_title: title,
-          dropbox_url: urlInput.value.trim() || '',
           received: recvChk.checked,
           required: reqChk.checked,
           sort_order: null,
         };
         const customRow = buildChecklistRow(area, title, pseudo, releaseId, false, group, currentAssets, null);
         group.insertBefore(customRow, strip);
-        titleInput.value = ''; urlInput.value = ''; recvChk.checked = false; reqChk.checked = true;
+        titleInput.value = ''; recvChk.checked = false; reqChk.checked = true;
         refreshGroupProgressFromDOM(group);
       });
 
@@ -4577,7 +4639,7 @@
         // Column header strip
         const colH = document.createElement('div');
         colH.className = 'checklist-col-header';
-        colH.innerHTML = '<span>Asset</span><span>Dropbox Link</span><span class="col-center">Received</span><span class="col-center">Required</span><span class="col-center">Delete</span>';
+        colH.innerHTML = '<span>Asset</span><span class="col-center">Received</span><span class="col-center">Required</span><span class="col-center">Delete</span>';
         group.appendChild(colH);
 
         // Template rows
@@ -4623,6 +4685,7 @@
       dbgA.releaseId(String(currentReleaseId));
       currentAssets    = assetFetch.rows;
       if (currentReleaseId) allAssetsCache[String(currentReleaseId)] = currentAssets;
+      setAssetsReleaseDropboxUi(await loadReleaseDropboxLink(currentReleaseId));
       refreshPipelineAssetCells();
       renderChecklist(currentReleaseId, currentAssets, currentActiveArea);
     }
@@ -4640,6 +4703,7 @@
         elAssetsError.style.display='none';
         elAssetsChecklist.innerHTML='';
         currentReleaseId=null;
+        setAssetsReleaseDropboxUi('');
         selectedAssetKeys.clear();
         updateBulkBar('assets-bulk-bar', 'assets-bulk-count', selectedAssetKeys);
         syncSelectAllCheckbox([], selectedAssetKeys, 'assets-select-all');
@@ -4673,11 +4737,11 @@
       }
       dbgA.saveError('');
       try {
+        await saveReleaseDropboxLink(currentReleaseId, (elAssetsReleaseDropbox && elAssetsReleaseDropbox.value) || '');
         for (const row of rows) {
           const existingId = row.dataset.assetId || null;
           const area = row.dataset.area || '';
           const nameInput = row.querySelector('.asset-name input[type="text"]');
-          const urlInput = row.querySelector('.asset-dropbox input');
           const recvChk = row.querySelector('.asset-received input[type="checkbox"]');
           const reqChk = row.querySelector('.asset-required input[type="checkbox"]');
           const errorEl = row.querySelector('.row-error');
@@ -4690,7 +4754,6 @@
             currentReleaseId,
             area,
             assetTitle,
-            urlInput ? urlInput.value.trim() : '',
             !!(recvChk && recvChk.checked),
             !!(reqChk && reqChk.checked),
             row.dataset.sortOrder ? Number(row.dataset.sortOrder) : null,
@@ -4716,6 +4779,12 @@
           elAssetsSaveAllBtn.textContent = 'Save Checklist';
         }
       }
+    }
+
+    if (elAssetsReleaseDropbox) {
+      elAssetsReleaseDropbox.addEventListener('input', function() {
+        setAssetsReleaseDropboxUi(elAssetsReleaseDropbox.value);
+      });
     }
 
     if (elAssetsSaveAllBtn) {
@@ -4814,10 +4883,10 @@
       // Update the hint text
       if (hint) {
         hint.textContent = shouldHide
-          ? 'Payees and shares are saved on this contract. Eddy calculator is not shown for this contract type.'
+          ? 'Receiving parties and shares are saved on this contract. Eddy calculator is not shown for this contract type.'
           : (isAddProducerType(typeVal)
               ? 'Add-Producer remains visible here for reference only. This contract type is excluded from royalty and statement flows.'
-              : 'Payees added here will pre-populate the Eddy calculator below.');
+              : 'Receiving parties added here will pre-populate the Eddy calculator below.');
       }
       updateContractDebug();
     }
@@ -4894,7 +4963,7 @@
       elPayeeTbody.innerHTML = '';
       if (cfPayees.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = '<td colspan="5" style="text-align:center; color:var(--muted); font-size:12px; padding:14px;">No payees added yet — use the row below to add one.</td>';
+        tr.innerHTML = '<td colspan="5" style="text-align:center; color:var(--muted); font-size:12px; padding:14px;">No receiving parties added yet — use the row below to add one.</td>';
         elPayeeTbody.appendChild(tr);
         recalcPayees();
         return;
@@ -4911,7 +4980,7 @@
         // Name input
         const nameTd = document.createElement('td');
         const nameIn = document.createElement('input');
-        nameIn.type = 'text'; nameIn.value = p.name || ''; nameIn.placeholder = 'Payee name';
+        nameIn.type = 'text'; nameIn.value = p.name || ''; nameIn.placeholder = 'Receiving party name';
         nameIn.addEventListener('input', function() {
           cfPayees[idx].name = nameIn.value;
           syncContractPayeesFromEddy();
@@ -4952,7 +5021,7 @@
         removeBtn.type = 'button';
         removeBtn.className = 'payee-remove-btn';
         removeBtn.textContent = '×';
-        removeBtn.title = 'Remove payee';
+        removeBtn.title = 'Remove receiving party';
         removeBtn.addEventListener('click', function() {
           cfPayees.splice(idx, 1);
           syncContractPayeesFromEddy();
@@ -5132,7 +5201,10 @@
         }))
         .concat((publishingCatalogueData || []).map(function(row) {
           return { catalogue_id: String(row.id), catalogue_type: 'publishing', work_title: row.work_title || '', writers: row.writers || '' };
-        }));
+        }))
+        .sort(function(a, b) {
+          return String(contractCatalogueLabel(a) || '').localeCompare(String(contractCatalogueLabel(b) || ''), undefined, { sensitivity: 'base' });
+        });
       return contractCatalogueOptions;
     }
 
@@ -5788,8 +5860,12 @@
 
     const elReleaseStartPanel = document.getElementById('release-start-panel');
     const elReleaseStartSearch = document.getElementById('release-start-search');
+    const elReleaseStartTypeFilter = document.getElementById('release-start-type-filter');
+    const elReleaseStartSort = document.getElementById('release-start-sort');
     const elReleaseStartResults = document.getElementById('release-start-results');
     const elReleaseStartFeedback = document.getElementById('release-start-feedback');
+    let releaseStartTypeFilter = 'all';
+    let releaseStartSort = 'artist_az';
 
     function setReleaseStartFeedback(msg, type) {
       if (!elReleaseStartFeedback) return;
@@ -5823,12 +5899,16 @@
 
     function getReleaseStartMatches() {
       const query = catalogueNormalizeText(elReleaseStartSearch ? elReleaseStartSearch.value : '').toLowerCase();
+      const typeFilter = String(releaseStartTypeFilter || 'all');
+      const sortMode = String(releaseStartSort || 'artist_az');
       const labelRows = getLabelCatalogueRows().map(function(row) {
         return {
           catalogue_type: 'label',
           catalogue_id: row.id,
           primary: row.artist || '—',
           secondary: row.track_title || '—',
+          sort_artist: row.artist || '',
+          sort_track: row.track_title || '',
           search: [row.artist, row.track_title, row.version, row.release_title, row.isrc].join(' ').toLowerCase()
         };
       });
@@ -5838,13 +5918,21 @@
           catalogue_id: row.id,
           primary: row.work_title || '—',
           secondary: row.writers || '—',
+          sort_artist: row.writers || '',
+          sort_track: row.work_title || '',
           search: [row.work_title, row.writers, row.tempo_id, row.iswc].join(' ').toLowerCase()
         };
       });
       return labelRows.concat(publishingRows).filter(function(item) {
+        if (typeFilter !== 'all' && item.catalogue_type !== typeFilter) return false;
         return !query || item.search.indexOf(query) !== -1;
       }).sort(function(a, b) {
-        return (a.primary + ' ' + a.secondary).localeCompare(b.primary + ' ' + b.secondary);
+        const cmpArtist = String(a.sort_artist || '').localeCompare(String(b.sort_artist || ''), undefined, { sensitivity: 'base' });
+        const cmpTrack = String(a.sort_track || '').localeCompare(String(b.sort_track || ''), undefined, { sensitivity: 'base' });
+        if (sortMode === 'artist_za') return -cmpArtist || cmpTrack;
+        if (sortMode === 'track_az') return cmpTrack || cmpArtist;
+        if (sortMode === 'track_za') return -cmpTrack || cmpArtist;
+        return cmpArtist || cmpTrack;
       });
     }
 
@@ -5891,6 +5979,10 @@
       setReleaseStartFeedback('', '');
       elReleaseStartPanel.classList.remove('hidden');
       if (elReleaseStartSearch) elReleaseStartSearch.value = '';
+      releaseStartTypeFilter = 'all';
+      releaseStartSort = 'artist_az';
+      if (elReleaseStartTypeFilter) elReleaseStartTypeFilter.value = releaseStartTypeFilter;
+      if (elReleaseStartSort) elReleaseStartSort.value = releaseStartSort;
       renderReleaseStartResults();
       if (elReleaseStartSearch) elReleaseStartSearch.focus();
     }
@@ -6053,6 +6145,18 @@
     if (document.getElementById('release-start-close')) document.getElementById('release-start-close').addEventListener('click', closeReleaseStartPanel);
     if (document.getElementById('release-start-cancel-btn')) document.getElementById('release-start-cancel-btn').addEventListener('click', closeReleaseStartPanel);
     if (elReleaseStartSearch) elReleaseStartSearch.addEventListener('input', renderReleaseStartResults);
+    if (elReleaseStartTypeFilter) {
+      elReleaseStartTypeFilter.addEventListener('change', function() {
+        releaseStartTypeFilter = elReleaseStartTypeFilter.value || 'all';
+        renderReleaseStartResults();
+      });
+    }
+    if (elReleaseStartSort) {
+      elReleaseStartSort.addEventListener('change', function() {
+        releaseStartSort = elReleaseStartSort.value || 'artist_az';
+        renderReleaseStartResults();
+      });
+    }
 
     // ── Save handler — INSERT or UPDATE based on whether re-id is populated ─────
     document.getElementById('release-edit-save-btn').addEventListener('click', async function() {
@@ -6139,7 +6243,9 @@
       if (elActionRelease) {
         const selectedQuick = elActionRelease.value;
         while (elActionRelease.options.length > 1) elActionRelease.remove(1);
-        (releasesData||[]).forEach(function(r) {
+        (releasesData||[]).slice().sort(function(a, b) {
+          return String(pipelineDisplayName(a) || '').localeCompare(String(pipelineDisplayName(b) || ''), undefined, { sensitivity: 'base' });
+        }).forEach(function(r) {
           const opt = document.createElement('option');
           opt.value = String(r.id);
           opt.textContent = pipelineDisplayName(r);
@@ -6152,7 +6258,9 @@
       if (aeReleaseId) {
         const selectedEdit = aeReleaseId.value;
         while (aeReleaseId.options.length > 1) aeReleaseId.remove(1);
-        (releasesData||[]).forEach(function(r) {
+        (releasesData||[]).slice().sort(function(a, b) {
+          return String(pipelineDisplayName(a) || '').localeCompare(String(pipelineDisplayName(b) || ''), undefined, { sensitivity: 'base' });
+        }).forEach(function(r) {
           const opt = document.createElement('option');
           opt.value = String(r.id);
           opt.textContent = pipelineDisplayName(r);
@@ -7125,8 +7233,10 @@
       const sel = document.getElementById('cp-existing-select');
       if (!sel) return;
       const current = sel.value;
-      sel.innerHTML = '<option value="">— Select existing payee —</option>';
-      allPayees.forEach(function(p) {
+      sel.innerHTML = '<option value="">— Select existing receiving party —</option>';
+      allPayees.slice().sort(function(a, b) {
+        return String(a && a.name || '').localeCompare(String(b && b.name || ''), undefined, { sensitivity: 'base' });
+      }).forEach(function(p) {
         const opt = document.createElement('option');
         opt.value = String(p.id);
         opt.textContent = p.name + (p.email ? ' (' + p.email + ')' : '');
@@ -7758,7 +7868,9 @@
       const current = stmtGetPeriod();
       if (current) set.add(current);
       entries.forEach(function(e) { if (e.period) set.add(e.period); });
-      return Array.from(set).sort();
+      return Array.from(set).sort(function(a, b) {
+        return String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' });
+      });
     }
 
     function stmtRebuildPeriodFilter() {
@@ -8118,7 +8230,7 @@ Best regards`;
 
     function exportContractsCsv() {
       downloadCsv('contracts', [
-        'Contract Title','Type','Release','Status','Sending Party','Parties / Payees','Artist Share','Date Sent','Received','Eddy','Dropbox','Notes'
+        'Contract Title','Type','Release','Status','Sending Party','Parties / Receiving Parties','Artist Share','Date Sent','Received','Eddy','Dropbox','Notes'
       ], (currentVisibleContracts || []).map(function(c) {
         const participates = contractParticipatesInRoyalties(c);
         return [
@@ -10867,12 +10979,18 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
           return;
         }
         sel.innerHTML = '<option value="">— select template —</option>';
-        customTemplates.filter(function(t) { return t.type === type; }).forEach(function(t) {
+        customTemplates
+          .filter(function(t) { return t.type === type; })
+          .slice()
+          .sort(function(a, b) {
+            return String(a && a.name || '').localeCompare(String(b && b.name || ''), undefined, { sensitivity: 'base' });
+          })
+          .forEach(function(t) {
           const o = document.createElement('option');
           o.value = 'custom:' + t.id;
           o.textContent = t.name;
           sel.appendChild(o);
-        });
+          });
         if (current && Array.from(sel.options).some(function(o) { return o.value === current; })) sel.value = current;
         else sel.value = '';
       }
