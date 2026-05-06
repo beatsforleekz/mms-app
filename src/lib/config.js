@@ -9,7 +9,7 @@ export const ROUTE_META = {
   '/catalogues': { title: 'Catalogues', subtitle: 'Structured catalogue views for label and publishing records.' },
   '/assets': { title: 'Assets Checklist', subtitle: 'Per-release asset checklist and linked delivery status.' },
   '/contracts': { title: 'Contracts', subtitle: 'Contract records, payees, royalty participation, and file links.' },
-  '/payees': { title: 'Payees', subtitle: 'Reusable payee records shared across contracts and statements.' },
+  '/workflow': { title: 'Workflow Suite', subtitle: 'Release workflow tracker from track pick through promo.' },
   '/actions': { title: 'Actions', subtitle: 'Operational task tracking ordered for day-to-day use.' },
   '/statements': { title: 'Statements', subtitle: 'Statement tracking, imports, and local storage workflows.' },
   '/contract-generator': { title: 'Doc Generator', subtitle: 'Plain-text document generation with reusable templates.' },
@@ -19,14 +19,15 @@ export const ROUTE_META = {
 
 export const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/actions', label: 'Actions' },
   { href: '/releases', label: 'Release Pipeline' },
-  { href: '/catalogues', label: 'Catalogues' },
+  { href: '/workflow', label: 'Workflow Suite' },
   { href: '/assets', label: 'Assets Checklist' },
   { href: '/contracts', label: 'Contracts' },
-  { href: '/payees', label: 'Payees' },
-  { href: '/actions', label: 'Actions' },
+  { href: '/qa', label: 'Quality Assurance' },
   { href: '/statements', label: 'Statements' },
-  { href: '/contract-generator', label: 'Doc Generator' },
+  { href: '/contract-generator', label: 'Contract Generator' },
+  { href: '/catalogues', label: 'Catalogues' },
   { href: '/help', label: 'Help' },
   { href: '/settings', label: 'Settings' }
 ];

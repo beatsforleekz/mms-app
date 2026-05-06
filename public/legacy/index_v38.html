@@ -346,6 +346,12 @@
     .release-dropbox-bar label { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; }
     .release-dropbox-bar input[type="url"] { flex: 1; width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; color: var(--text); background: var(--surface); outline: none; transition: border-color .12s; }
     .release-dropbox-bar input[type="url"]:focus { border-color: var(--accent); }
+    .release-dropbox-bar input[type="url"].unsaved { border-color: #d97706; background: #fffbeb; }
+    .release-dropbox-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .release-dropbox-status.saving { color: #92400e; }
+    .release-dropbox-status.saved { color: #065f46; }
+    .release-dropbox-status.error { color: #b91c1c; }
+    .assets-save-bottom { display:flex; justify-content:flex-end; margin-top:12px; }
 
     .checklist-group { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 14px; }
 
@@ -1614,13 +1620,15 @@
     <nav>
       <div class="nav-label">Modules</div>
       <button class="nav-btn active" data-section="dashboard"><span class="icon">▦</span> Dashboard</button>
+      <button class="nav-btn" data-section="actions"><span class="icon">✓</span> Actions</button>
       <button class="nav-btn" data-section="releases"><span class="icon">⎇</span> Release Pipeline</button>
+      <button class="nav-btn" data-section="workflow"><span class="icon">⚑</span> Workflow Suite</button>
       <button class="nav-btn" data-section="assets"><span class="icon">◈</span> Assets Checklist</button>
       <button class="nav-btn" data-section="contracts"><span class="icon">◻</span> Contracts</button>
       <button class="nav-btn" data-section="payees" style="display:none;"><span class="icon">👤</span> Payees</button>
-      <button class="nav-btn" data-section="actions"><span class="icon">✓</span> Actions</button>
+      <button class="nav-btn" data-section="qa"><span class="icon">⊛</span> Quality Assurance</button>
       <button class="nav-btn" data-section="statements"><span class="icon">$</span> Statements</button>
-      <button class="nav-btn" data-section="contract-generator"><span class="icon">✍</span> Doc Generator</button>
+      <button class="nav-btn" data-section="contract-generator"><span class="icon">✍</span> Contract Generator</button>
     </nav>
     <div class="sidebar-footer">Operations · Internal tool</div>
   </aside>
@@ -1975,11 +1983,12 @@
           <select id="assets-release-select"><option value="">— select a release —</option></select>
           <span id="assets-load-status" style="font-size:12px; color:var(--muted);"></span>
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-left:auto;"><input type="checkbox" id="assets-select-all" style="accent-color:var(--accent);" /> Select All Visible</label>
-          <button class="btn btn-primary" id="assets-save-all-btn" type="button">Save Checklist</button>
         </div>
         <div class="release-dropbox-bar">
           <label for="assets-release-dropbox">Release Dropbox Link</label>
           <input id="assets-release-dropbox" type="url" placeholder="Paste release folder Dropbox link…" />
+          <button class="btn btn-primary" id="assets-release-dropbox-save-btn" type="button" style="font-size:12px; padding:6px 10px;">Save Link</button>
+          <span id="assets-release-dropbox-status" class="release-dropbox-status"> </span>
           <a id="assets-release-dropbox-open" class="btn btn-ghost" href="#" target="_blank" rel="noopener noreferrer" style="display:none; font-size:12px; padding:6px 10px;">Open Folder</a>
         </div>
         <div class="bulk-bar" id="assets-bulk-bar">
@@ -1992,10 +2001,8 @@
 
         <div class="tab-bar" id="assets-tab-bar">
           <button class="active" data-area="all">All</button>
-          <button data-area="Creative">Creative</button>
-          <button data-area="Copy">Copy</button>
-          <button data-area="Technical">Technical</button>
           <button data-area="Legal">Legal</button>
+          <button data-area="Onboarding">Onboarding</button>
           <button data-area="Other">Other</button>
         </div>
 
@@ -2019,6 +2026,30 @@
 
         <div id="assets-error" class="assets-status-msg" style="display:none; color:#b91c1c;"></div>
         <div id="assets-checklist"></div>
+        <div class="assets-save-bottom">
+          <button class="btn btn-primary" id="assets-save-all-btn" type="button">Save Checklist</button>
+        </div>
+      </section>
+
+      <section id="section-workflow" class="section">
+        <div class="section-header">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div><h2>Workflow Suite</h2><p>Release workflow tracker from track pick to promo.</p></div>
+          </div>
+        </div>
+        <hr class="divider" />
+        <div class="release-selector-bar">
+          <label for="workflow-release-select">Track workflow for:</label>
+          <select id="workflow-release-select"><option value="">— select a release —</option></select>
+          <span id="workflow-load-status" style="font-size:12px; color:var(--muted);"></span>
+          <button class="btn btn-primary" id="workflow-save-btn" type="button" style="margin-left:auto;">Save Workflow</button>
+        </div>
+        <div id="workflow-placeholder" class="assets-placeholder">
+          <div class="ph-icon">⚑</div>
+          <div class="ph-text">Select a release above</div>
+          to view and update workflow steps.
+        </div>
+        <div id="workflow-list"></div>
       </section>
 
       <!-- CONTRACTS -->
@@ -2875,7 +2906,7 @@
     const APP_PARAMS = new URLSearchParams(window.location.search);
     const EMBED_MODE = APP_PARAMS.get('embed') === '1';
     const INITIAL_SECTION = APP_PARAMS.get('section') || 'dashboard';
-    const TITLES = { 'dashboard':'Dashboard','releases':'Release Pipeline','assets':'Assets Checklist','contracts':'Contracts','payees':'Payees','actions':'Actions','statements':'Statements','contract-generator':'Doc Generator' };
+    const TITLES = { 'dashboard':'Dashboard','releases':'Release Pipeline','assets':'Assets Checklist','contracts':'Contracts','payees':'Payees','workflow':'Workflow Suite','actions':'Actions','statements':'Statements','contract-generator':'Doc Generator' };
     const navButtons  = document.querySelectorAll('.nav-btn');
     const sections    = document.querySelectorAll('.section');
     const topbarTitle = document.getElementById('topbar-title');
@@ -2888,6 +2919,11 @@
       if (id === 'assets' && typeof refreshAssetsReleaseDropdownFromPipeline === 'function') {
         refreshAssetsReleaseDropdownFromPipeline().catch(function(err) {
           console.warn('[Assets Checklist] Failed to refresh release dropdown:', err && err.message ? err.message : err);
+        });
+      }
+      if (id === 'workflow' && typeof refreshAssetsReleaseDropdownFromPipeline === 'function') {
+        refreshAssetsReleaseDropdownFromPipeline().catch(function(err) {
+          console.warn('[Workflow Suite] Failed to refresh release dropdown:', err && err.message ? err.message : err);
         });
       }
       if (!EMBED_MODE) {
@@ -2955,27 +2991,43 @@
     //  Lookup key in JS: area + '|' + title  (pipe-separated, avoids :: clash)
     // ══════════════════════════════════════════════════════════════════════════
     const ASSET_TEMPLATE = [
-      { area: 'Creative',  title: 'Artwork (3000×3000 px)',         sort: 10 },
-      { area: 'Creative',  title: 'Press Photo',                    sort: 20 },
-      { area: 'Creative',  title: 'Banner / Social Artwork',        sort: 30 },
-      { area: 'Copy',      title: 'Bio / Artist Statement',         sort: 10 },
-      { area: 'Copy',      title: 'Track Metadata & Credits',       sort: 20 },
-      { area: 'Copy',      title: 'Pitch Copy / PR Notes',          sort: 30 },
-      { area: 'Technical', title: 'Audio Master (WAV)',             sort: 10 },
-      { area: 'Technical', title: 'ISRC Code(s)',                   sort: 20 },
-      { area: 'Technical', title: 'UPC / Barcode',                  sort: 30 },
-      { area: 'Technical', title: 'Upload Confirmation',            sort: 40 },
       { area: 'Legal',     title: 'Contract PDF (Signed)',          sort: 10 },
       { area: 'Legal',     title: 'Splits / Publishing Agreement',  sort: 20 },
       { area: 'Legal',     title: 'Sync Clearances (if applicable)',sort: 30 },
-      { area: 'Other',     title: 'Registration Details (PRO)',     sort: 10 },
-      { area: 'Other',     title: 'Miscellaneous Notes / Links',    sort: 20 },
+      { area: 'Legal',     title: 'Label Copy',                     sort: 40 },
+      { area: 'Onboarding',title: 'Artwork',                        sort: 10 },
+      { area: 'Onboarding',title: 'Press Photo',                    sort: 20 },
+      { area: 'Onboarding',title: 'Bio / Artist Statement',         sort: 30 },
+      { area: 'Onboarding',title: 'Audio Master (Original)',        sort: 40 },
+      { area: 'Onboarding',title: 'Audio Master (Radio Edit)',      sort: 50 },
+      { area: 'Onboarding',title: 'Traxsource Upload',              sort: 60 },
+      { area: 'Onboarding',title: 'Beatport Upload',                sort: 70 },
+      { area: 'Onboarding',title: 'DSP Upload',                     sort: 80 },
+      { area: 'Onboarding',title: 'Pitch Copy / PR Notes',          sort: 90 },
+      { area: 'Other',     title: 'Miscellaneous Notes / Links',    sort: 10 },
     ];
 
-    const ALL_AREAS = ['Creative','Copy','Technical','Legal','Other'];
+    const ALL_AREAS = ['Legal','Onboarding','Other'];
+    const ASSET_OPTIONAL_DEFAULTS = new Set([
+      'Legal|Sync Clearances (if applicable)',
+      'Other|Miscellaneous Notes / Links'
+    ]);
 
     // JS-side lookup key: keeps area and title separate in DB, combined in JS
     function rowKey(area, title) { return area + '|' + title; }
+
+    function normalizeAssetArea(area) {
+      const raw = String(area || '').trim();
+      if (raw === 'Creative' || raw === 'Copy' || raw === 'Technical') return 'Onboarding';
+      return raw;
+    }
+    function normalizeAssetTitle(title) {
+      const raw = String(title || '').trim();
+      if (raw === 'Track Metadata & Credits') return 'Label Copy';
+      if (raw === 'Audio Master (WAV)') return 'Audio Master (Original)';
+      if (raw === 'Upload Confirmation') return 'Traxsource Upload';
+      return raw;
+    }
 
     function escapeHtml(value) {
       return String(value == null ? '' : value)
@@ -3528,7 +3580,13 @@
       const map = {};
       (assetsData || []).forEach(function(a) {
         if (a.area && a.asset_title) {
-          map[rowKey(a.area, a.asset_title)] = a;
+          const normalizedArea = normalizeAssetArea(a.area);
+          const normalizedTitle = normalizeAssetTitle(a.asset_title);
+          const normalizedRow = Object.assign({}, a, {
+            area: normalizedArea,
+            asset_title: normalizedTitle
+          });
+          map[rowKey(normalizedArea, normalizedTitle)] = normalizedRow;
         }
       });
       return map;
@@ -3552,6 +3610,12 @@
         // Custom items: DB rows for this area not covered by template
         const templateTitles = new Set(templateItems.map(t => t.title));
         const customItems = (assetsData || [])
+          .map(function(a) {
+            return Object.assign({}, a, {
+              area: normalizeAssetArea(a.area),
+              asset_title: normalizeAssetTitle(a.asset_title)
+            });
+          })
           .filter(a => a.area === area && a.asset_title && !templateTitles.has(a.asset_title));
 
         // All items = template + custom
@@ -3563,7 +3627,10 @@
         // Which are required?
         const requiredItems = allItems.filter(function(item) {
           const existing = lookup[rowKey(area, item.title)];
-          if (!existing) return item.fromTemplate; // template with no DB row = required by default
+          if (!existing) {
+            if (!item.fromTemplate) return false;
+            return !ASSET_OPTIONAL_DEFAULTS.has(rowKey(area, item.title));
+          }
           return existing.required !== false;
         });
 
@@ -3814,7 +3881,12 @@
 
     function uploadConfirmationReceived(assetsCache) {
       return (assetsCache || []).some(function(a) {
-        return String(a.area || '') === 'Technical' && String(a.asset_title || '') === 'Upload Confirmation' && a.received === true;
+        const area = normalizeAssetArea(a && a.area);
+        const title = normalizeAssetTitle(a && a.asset_title);
+        if (area === 'Onboarding' && (title === 'Traxsource Upload' || title === 'Beatport Upload' || title === 'DSP Upload')) {
+          return a && a.received === true;
+        }
+        return String(a && a.area || '') === 'Technical' && String(a && a.asset_title || '') === 'Upload Confirmation' && a && a.received === true;
       });
     }
 
@@ -4086,6 +4158,7 @@
               selectedReleaseIds.delete(String(r.id));
               await releaseTableRefresh();
               populateAssetsReleaseDropdown(currentReleasesData);
+              if (typeof populateWorkflowReleaseDropdown === 'function') populateWorkflowReleaseDropdown(currentReleasesData);
               populateContractReleaseDropdown(currentReleasesData);
               if (typeof populateActionReleaseDropdown === 'function') populateActionReleaseDropdown(currentReleasesData);
             } catch(err) { alert('Delete failed: ' + err.message); }
@@ -4144,6 +4217,8 @@
     const elAssetsChecklist     = document.getElementById('assets-checklist');
     const elAssetsSaveAllBtn    = document.getElementById('assets-save-all-btn');
     const elAssetsReleaseDropbox = document.getElementById('assets-release-dropbox');
+    const elAssetsReleaseDropboxSaveBtn = document.getElementById('assets-release-dropbox-save-btn');
+    const elAssetsReleaseDropboxStatus = document.getElementById('assets-release-dropbox-status');
     const elAssetsReleaseDropboxOpen = document.getElementById('assets-release-dropbox-open');
 
     const dbgA = {
@@ -4178,12 +4253,31 @@
     // Used to verify and retrieve the correct UUID/id before saving.
     const releaseIdMap = {};
     let currentReleaseDropboxLink = '';
+    let currentReleaseDropboxSavedValue = '';
     let releaseDropboxStorageField = null;
+
+    function setAssetsDropboxStatus(message, cls) {
+      if (!elAssetsReleaseDropboxStatus) return;
+      elAssetsReleaseDropboxStatus.textContent = message || ' ';
+      elAssetsReleaseDropboxStatus.className = 'release-dropbox-status' + (cls ? (' ' + cls) : '');
+    }
+
+    function syncAssetsDropboxDirtyState() {
+      if (!elAssetsReleaseDropbox) return;
+      const current = String(elAssetsReleaseDropbox.value || '').trim();
+      const dirty = current !== String(currentReleaseDropboxSavedValue || '').trim();
+      elAssetsReleaseDropbox.classList.toggle('unsaved', dirty);
+      if (dirty) setAssetsDropboxStatus('Unsaved changes', '');
+      else if (current) setAssetsDropboxStatus('Saved', 'saved');
+      else setAssetsDropboxStatus(' ', '');
+    }
 
     function setAssetsReleaseDropboxUi(value) {
       const url = String(value || '').trim();
       currentReleaseDropboxLink = url;
+      currentReleaseDropboxSavedValue = url;
       if (elAssetsReleaseDropbox) elAssetsReleaseDropbox.value = url;
+      syncAssetsDropboxDirtyState();
       if (!elAssetsReleaseDropboxOpen) return;
       if (url) {
         elAssetsReleaseDropboxOpen.href = url;
@@ -4232,15 +4326,21 @@
 
     async function saveReleaseDropboxLink(releaseId, url) {
       const rid = String(releaseId || '');
-      if (!rid) return;
+      if (!rid) return { ok: false, error: 'Missing release id' };
       const clean = String(url || '').trim();
       const field = await detectReleaseDropboxStorageField();
       if (field && db) {
         try {
-          await db.from('releases').update({ [field]: clean || null }).eq('id', rid);
-        } catch (err) {}
+          const { error } = await db.from('releases').update({ [field]: clean || null }).eq('id', rid);
+          if (error) return { ok: false, error: error.message || 'Failed to save release Dropbox link' };
+        } catch (err) {
+          return { ok: false, error: err && err.message ? err.message : 'Failed to save release Dropbox link' };
+        }
       }
       saveReleaseMeta(rid, { assets_release_dropbox_url: clean || null });
+      currentReleaseDropboxSavedValue = clean;
+      syncAssetsDropboxDirtyState();
+      return { ok: true };
     }
 
     function populateAssetsReleaseDropdown(releasesData) {
@@ -4268,6 +4368,7 @@
       currentReleasesData = rows || [];
       refreshReleaseMap(currentReleasesData);
       populateAssetsReleaseDropdown(currentReleasesData);
+      if (typeof populateWorkflowReleaseDropdown === 'function') populateWorkflowReleaseDropdown(currentReleasesData);
       return currentReleasesData;
     }
 
@@ -4361,14 +4462,24 @@
       const lookup = buildAssetLookup(assetsData);
       const templateItems = ASSET_TEMPLATE.filter(t => t.area === area);
       const templateTitles = new Set(templateItems.map(t => t.title));
-      const customItems = assetsData.filter(a => a.area === area && a.asset_title && !templateTitles.has(a.asset_title));
+      const customItems = (assetsData || [])
+        .map(function(a) {
+          return Object.assign({}, a, {
+            area: normalizeAssetArea(a.area),
+            asset_title: normalizeAssetTitle(a.asset_title)
+          });
+        })
+        .filter(a => a.area === area && a.asset_title && !templateTitles.has(a.asset_title));
       const allItems = [
         ...templateItems.map(t => t.title),
         ...customItems.map(a => a.asset_title),
       ];
       const required = allItems.filter(function(title) {
         const row = lookup[rowKey(area, title)];
-        if (!row) return templateTitles.has(title); // template default required
+        if (!row) {
+          if (!templateTitles.has(title)) return false;
+          return !ASSET_OPTIONAL_DEFAULTS.has(rowKey(area, title));
+        }
         return row.required !== false;
       });
       const received = required.filter(function(title) {
@@ -4405,7 +4516,7 @@
     // ── buildChecklistRow ── create a DOM row for one asset item
     function buildChecklistRow(area, assetTitle, existing, releaseId, isTemplate, group, assetsData, defaultSort) {
       const dbId      = existing ? existing.id : null;
-      const isReq     = existing ? existing.required !== false : true;
+      const isReq     = existing ? existing.required !== false : !ASSET_OPTIONAL_DEFAULTS.has(rowKey(area, assetTitle));
       const isRecv    = !!(existing && existing.received === true);
       const sortOrder = (existing && existing.sort_order != null ? existing.sort_order : defaultSort) || null;
       const displayTitle = (existing && existing.asset_title) ? existing.asset_title : assetTitle;
@@ -4606,13 +4717,23 @@
         const templateItems = ASSET_TEMPLATE.filter(t => t.area === area);
         const templateTitles = new Set(templateItems.map(t => t.title));
         // Custom items = DB rows for this area not in template
-        const customItems = assetsData.filter(a => a.area === area && a.asset_title && !templateTitles.has(a.asset_title));
+        const customItems = (assetsData || [])
+          .map(function(a) {
+            return Object.assign({}, a, {
+              area: normalizeAssetArea(a.area),
+              asset_title: normalizeAssetTitle(a.asset_title)
+            });
+          })
+          .filter(a => a.area === area && a.asset_title && !templateTitles.has(a.asset_title));
 
         // Progress stats
         const allTitles = [...templateItems.map(t=>t.title), ...customItems.map(a=>a.asset_title)];
         const required  = allTitles.filter(function(title) {
           const row = lookup[rowKey(area, title)];
-          if (!row) return templateTitles.has(title);
+          if (!row) {
+            if (!templateTitles.has(title)) return false;
+            return !ASSET_OPTIONAL_DEFAULTS.has(rowKey(area, title));
+          }
           return row.required !== false;
         });
         const received = required.filter(function(title) {
@@ -4704,6 +4825,7 @@
         elAssetsChecklist.innerHTML='';
         currentReleaseId=null;
         setAssetsReleaseDropboxUi('');
+        setAssetsDropboxStatus(' ', '');
         selectedAssetKeys.clear();
         updateBulkBar('assets-bulk-bar', 'assets-bulk-count', selectedAssetKeys);
         syncSelectAllCheckbox([], selectedAssetKeys, 'assets-select-all');
@@ -4730,14 +4852,19 @@
         return;
       }
       const rows = Array.from(elAssetsChecklist.querySelectorAll('.checklist-row'));
-      if (!rows.length) return;
       if (elAssetsSaveAllBtn) {
         elAssetsSaveAllBtn.disabled = true;
         elAssetsSaveAllBtn.textContent = 'Saving…';
       }
       dbgA.saveError('');
       try {
-        await saveReleaseDropboxLink(currentReleaseId, (elAssetsReleaseDropbox && elAssetsReleaseDropbox.value) || '');
+        setAssetsDropboxStatus('Saving…', 'saving');
+        const dropboxSave = await saveReleaseDropboxLink(currentReleaseId, (elAssetsReleaseDropbox && elAssetsReleaseDropbox.value) || '');
+        if (!dropboxSave.ok) {
+          setAssetsDropboxStatus('Save failed: ' + (dropboxSave.error || 'Unknown error'), 'error');
+        } else {
+          setAssetsDropboxStatus('Saved', 'saved');
+        }
         for (const row of rows) {
           const existingId = row.dataset.assetId || null;
           const area = row.dataset.area || '';
@@ -4783,13 +4910,268 @@
 
     if (elAssetsReleaseDropbox) {
       elAssetsReleaseDropbox.addEventListener('input', function() {
-        setAssetsReleaseDropboxUi(elAssetsReleaseDropbox.value);
+        currentReleaseDropboxLink = String(elAssetsReleaseDropbox.value || '').trim();
+        syncAssetsDropboxDirtyState();
+        if (elAssetsReleaseDropboxOpen) {
+          if (currentReleaseDropboxLink) {
+            elAssetsReleaseDropboxOpen.href = currentReleaseDropboxLink;
+            elAssetsReleaseDropboxOpen.style.display = 'inline-flex';
+          } else {
+            elAssetsReleaseDropboxOpen.href = '#';
+            elAssetsReleaseDropboxOpen.style.display = 'none';
+          }
+        }
+      });
+    }
+    if (elAssetsReleaseDropboxSaveBtn) {
+      elAssetsReleaseDropboxSaveBtn.addEventListener('click', async function() {
+        if (!currentReleaseId) { setAssetsDropboxStatus('Save failed: select a release first', 'error'); return; }
+        setAssetsDropboxStatus('Saving…', 'saving');
+        const result = await saveReleaseDropboxLink(currentReleaseId, (elAssetsReleaseDropbox && elAssetsReleaseDropbox.value) || '');
+        if (result.ok) setAssetsDropboxStatus('Saved', 'saved');
+        else setAssetsDropboxStatus('Save failed: ' + (result.error || 'Unknown error'), 'error');
       });
     }
 
     if (elAssetsSaveAllBtn) {
       elAssetsSaveAllBtn.addEventListener('click', saveAllAssetsForCurrentRelease);
     }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    //  WORKFLOW SUITE (Supabase-backed, release-linked)
+    // ══════════════════════════════════════════════════════════════════════════
+    const WORKFLOW_STATUS = ['Not Started','In Progress','Done','Blocked'];
+    const WORKFLOW_STEPS = [
+      'Rob Picks Track',
+      'Office Sends Contract',
+      'Contract Returned',
+      'File Contract',
+      'Add to MMS App and Statement System',
+      'Send Onboarding Link',
+      'Check Google Form / Onboarding Complete',
+      'Create Label Copy',
+      'Create Artwork',
+      'Mark Assets Received in Checklist',
+      'Email DAMS / Socials / Colour Codes',
+      'Complete Uploads',
+      'Create Pitching Sheet',
+      'Pitch Spotify for Artists',
+      'Create Artist Campaign Update Email',
+      'Club Promo',
+      'Radio Promo'
+    ];
+    const WORKFLOW_HELP = {
+      'Contract Returned': 'Reminder: check Legal > Contract PDF (Signed) in Assets Checklist.',
+      'Create Label Copy': 'Reminder: check Onboarding > Label Copy in Assets Checklist.',
+      'Complete Uploads': 'Reminder: check Onboarding > Traxsource Upload, Beatport Upload, DSP Upload.'
+    };
+    const elWorkflowReleaseSelect = document.getElementById('workflow-release-select');
+    const elWorkflowLoadStatus = document.getElementById('workflow-load-status');
+    const elWorkflowSaveBtn = document.getElementById('workflow-save-btn');
+    const elWorkflowPlaceholder = document.getElementById('workflow-placeholder');
+    const elWorkflowList = document.getElementById('workflow-list');
+    let currentWorkflowReleaseId = '';
+    let currentWorkflowRows = [];
+    function workflowSetStatus(msg) {
+      if (!elWorkflowLoadStatus) return;
+      elWorkflowLoadStatus.textContent = msg || '';
+    }
+    function workflowStepKey(step) {
+      return String(step || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+    function workflowDefaultRows() {
+      return WORKFLOW_STEPS.map(function(step, idx) {
+        return {
+          id: idx + 1,
+          step_order: idx + 1,
+          step_key: workflowStepKey(step),
+          step_title: step,
+          status: 'Not Started',
+          notes: '',
+          due_date: ''
+        };
+      });
+    }
+    async function workflowLoadRows(releaseId) {
+      const rid = String(releaseId || '');
+      if (!rid) return workflowDefaultRows();
+      if (!db) return workflowDefaultRows();
+      const { data, error } = await db
+        .from('workflow_steps')
+        .select('release_id,step_order,step_key,step_title,status,notes,due_date,updated_at')
+        .eq('release_id', rid)
+        .order('step_order', { ascending: true });
+      if (error) throw error;
+      if (!data || !data.length) return workflowDefaultRows();
+      const byOrder = {};
+      (data || []).forEach(function(row) {
+        byOrder[Number(row.step_order)] = row || {};
+      });
+      return WORKFLOW_STEPS.map(function(step, idx) {
+        const stepOrder = idx + 1;
+        const saved = byOrder[stepOrder] || {};
+        const status = WORKFLOW_STATUS.indexOf(String(saved.status || '')) >= 0 ? String(saved.status) : 'Not Started';
+        return {
+          id: stepOrder,
+          step_order: stepOrder,
+          step_key: String(saved.step_key || workflowStepKey(step)),
+          step_title: step,
+          status: status,
+          notes: String(saved.notes || ''),
+          due_date: normalizeDateValue(saved.due_date || '')
+        };
+      });
+    }
+    async function workflowSaveCurrent() {
+      const rid = String(currentWorkflowReleaseId || '');
+      if (!rid) { workflowSetStatus('Save failed: select a release first'); return; }
+      if (!db) { workflowSetStatus('Save failed: Supabase not initialised'); return; }
+      workflowSetStatus('Saving…');
+      if (elWorkflowSaveBtn) { elWorkflowSaveBtn.disabled = true; elWorkflowSaveBtn.textContent = 'Saving…'; }
+      try {
+        const rows = (currentWorkflowRows || []).map(function(row, idx) {
+          const stepOrder = idx + 1;
+          return {
+            release_id: rid,
+            step_order: stepOrder,
+            step_key: String(row && row.step_key || workflowStepKey(row && row.step_title || '')),
+            step_title: String(row && row.step_title || ''),
+            status: WORKFLOW_STATUS.indexOf(String(row && row.status || '')) >= 0 ? String(row.status) : 'Not Started',
+            notes: String(row && row.notes || ''),
+            due_date: normalizeDateValue(row && row.due_date || '') || null
+          };
+        });
+        const { error } = await db.from('workflow_steps').upsert(rows, { onConflict: 'release_id,step_order' });
+        if (error) throw error;
+        workflowSetStatus('Saved');
+      } catch (err) {
+        workflowSetStatus('Save failed: ' + (err && err.message ? err.message : String(err)));
+      } finally {
+        if (elWorkflowSaveBtn) { elWorkflowSaveBtn.disabled = false; elWorkflowSaveBtn.textContent = 'Save Workflow'; }
+      }
+    }
+    function workflowRenderCurrentRows() {
+      if (!elWorkflowList || !elWorkflowPlaceholder) return;
+      const rid = String(currentWorkflowReleaseId || '');
+      if (!rid) {
+        elWorkflowPlaceholder.style.display = 'block';
+        elWorkflowList.innerHTML = '';
+        return;
+      }
+      elWorkflowPlaceholder.style.display = 'none';
+      const rows = currentWorkflowRows;
+      const wrap = document.createElement('div');
+      wrap.className = 'checklist-group';
+      const head = document.createElement('div');
+      head.className = 'checklist-group-header';
+      head.innerHTML = '<span class="checklist-group-title">Workflow Steps</span><span class="checklist-progress">' + rows.filter(function(r){ return r.status === 'Done'; }).length + ' / ' + rows.length + ' done</span>';
+      wrap.appendChild(head);
+
+      const table = document.createElement('div');
+      table.style.display = 'grid';
+      table.style.gridTemplateColumns = '40px minmax(260px,1fr) 140px 130px minmax(180px,1fr)';
+      table.style.borderTop = '1px solid var(--border)';
+      table.innerHTML =
+        '<div class="checklist-cell" style="font-weight:700;">#</div>' +
+        '<div class="checklist-cell" style="font-weight:700;">Step</div>' +
+        '<div class="checklist-cell" style="font-weight:700;">Status</div>' +
+        '<div class="checklist-cell" style="font-weight:700;">Due Date</div>' +
+        '<div class="checklist-cell" style="font-weight:700;">Notes</div>';
+      rows.forEach(function(row, idx) {
+        const num = document.createElement('div'); num.className = 'checklist-cell'; num.textContent = String(idx + 1);
+        const step = document.createElement('div'); step.className = 'checklist-cell';
+        step.innerHTML = '<div style="font-weight:500;">' + escapeHtml(row.step_title) + '</div>' + (WORKFLOW_HELP[row.step_title] ? ('<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + escapeHtml(WORKFLOW_HELP[row.step_title]) + '</div>') : '');
+        const statusCell = document.createElement('div'); statusCell.className = 'checklist-cell';
+        const statusSel = document.createElement('select');
+        statusSel.style.width = '100%';
+        statusSel.style.padding = '5px 8px';
+        statusSel.style.border = '1px solid var(--border)';
+        statusSel.style.borderRadius = '4px';
+        WORKFLOW_STATUS.forEach(function(s) {
+          const opt = document.createElement('option');
+          opt.value = s; opt.textContent = s;
+          if (s === row.status) opt.selected = true;
+          statusSel.appendChild(opt);
+        });
+        statusSel.addEventListener('change', function() {
+          currentWorkflowRows[idx].status = statusSel.value;
+          workflowSetStatus('');
+          workflowRenderCurrentRows();
+        });
+        statusCell.appendChild(statusSel);
+        const dueCell = document.createElement('div'); dueCell.className = 'checklist-cell';
+        const due = document.createElement('input');
+        due.type = 'date';
+        due.value = row.due_date || '';
+        due.style.width = '100%';
+        due.style.padding = '5px 8px';
+        due.style.border = '1px solid var(--border)';
+        due.style.borderRadius = '4px';
+        due.addEventListener('change', function() {
+          currentWorkflowRows[idx].due_date = normalizeDateValue(due.value || '');
+          workflowSetStatus('');
+        });
+        dueCell.appendChild(due);
+        const notesCell = document.createElement('div'); notesCell.className = 'checklist-cell';
+        const notes = document.createElement('input');
+        notes.type = 'text';
+        notes.value = row.notes || '';
+        notes.placeholder = 'Optional note…';
+        notes.style.width = '100%';
+        notes.style.padding = '5px 8px';
+        notes.style.border = '1px solid var(--border)';
+        notes.style.borderRadius = '4px';
+        notes.addEventListener('change', function() {
+          currentWorkflowRows[idx].notes = notes.value || '';
+          workflowSetStatus('');
+        });
+        notesCell.appendChild(notes);
+        table.append(num, step, statusCell, dueCell, notesCell);
+      });
+      wrap.appendChild(table);
+      elWorkflowList.innerHTML = '';
+      elWorkflowList.appendChild(wrap);
+    }
+    function populateWorkflowReleaseDropdown(releasesData) {
+      if (!elWorkflowReleaseSelect) return;
+      const selected = elWorkflowReleaseSelect.value;
+      while (elWorkflowReleaseSelect.options.length > 1) elWorkflowReleaseSelect.remove(1);
+      (releasesData || []).slice().sort(function(a, b) {
+        return String(pipelineDisplayName(a) || '').localeCompare(String(pipelineDisplayName(b) || ''), undefined, { sensitivity: 'base' });
+      }).forEach(function(r) {
+        const opt = document.createElement('option');
+        opt.value = String(r.id);
+        opt.textContent = pipelineDisplayName(r);
+        elWorkflowReleaseSelect.appendChild(opt);
+      });
+      if (selected && Array.from(elWorkflowReleaseSelect.options).some(function(opt) { return opt.value === selected; })) {
+        elWorkflowReleaseSelect.value = selected;
+        currentWorkflowReleaseId = selected;
+        elWorkflowReleaseSelect.dispatchEvent(new Event('change'));
+      }
+    }
+    if (elWorkflowReleaseSelect) {
+      elWorkflowReleaseSelect.addEventListener('change', async function() {
+        currentWorkflowReleaseId = String(elWorkflowReleaseSelect.value || '');
+        if (!currentWorkflowReleaseId) {
+          currentWorkflowRows = [];
+          workflowRenderCurrentRows();
+          workflowSetStatus('');
+          return;
+        }
+        workflowSetStatus('Loading…');
+        try {
+          currentWorkflowRows = await workflowLoadRows(currentWorkflowReleaseId);
+          workflowRenderCurrentRows();
+          workflowSetStatus('Loaded');
+        } catch (err) {
+          currentWorkflowRows = workflowDefaultRows();
+          workflowRenderCurrentRows();
+          workflowSetStatus('Load failed: ' + (err && err.message ? err.message : String(err)));
+        }
+      });
+    }
+    if (elWorkflowSaveBtn) elWorkflowSaveBtn.addEventListener('click', workflowSaveCurrent);
     // ══════════════════════════════════════════════════════════════════════════
     //  CONTRACTS (v24)
     //  New: artist_share_percent, payees_json (JSON array of payee objects)
@@ -6054,6 +6436,7 @@
       const rows = await fetchReleases();
       currentReleasesData = rows || [];
       populateAssetsReleaseDropdown(currentReleasesData);
+      if (typeof populateWorkflowReleaseDropdown === 'function') populateWorkflowReleaseDropdown(currentReleasesData);
       populateContractReleaseDropdown(currentReleasesData);
       if (typeof populateActionReleaseDropdown === 'function') populateActionReleaseDropdown(currentReleasesData);
       if (typeof renderContractsTable === 'function') renderContractsTable();
@@ -11637,6 +12020,7 @@ e. Termination of this Agreement pursuant to clauses 17.a or 17.b shall be witho
       currentReleasesData = releasesData || [];
       refreshReleaseMap(currentReleasesData);
       populateAssetsReleaseDropdown(currentReleasesData);
+      if (typeof populateWorkflowReleaseDropdown === 'function') populateWorkflowReleaseDropdown(currentReleasesData);
       populateContractReleaseDropdown(currentReleasesData);
       populateActionReleaseDropdown(currentReleasesData);
       if (typeof renderContractsTable === 'function') renderContractsTable();
