@@ -1621,8 +1621,8 @@
       <div class="nav-label">Modules</div>
       <button class="nav-btn active" data-section="dashboard"><span class="icon">▦</span> Dashboard</button>
       <button class="nav-btn" data-section="actions"><span class="icon">✓</span> Actions</button>
-      <button class="nav-btn" data-section="releases"><span class="icon">⎇</span> Release Pipeline</button>
       <button class="nav-btn" data-section="workflow"><span class="icon">⚑</span> Workflow Suite</button>
+      <button class="nav-btn" data-section="releases"><span class="icon">⎇</span> Release Pipeline</button>
       <button class="nav-btn" data-section="assets"><span class="icon">◈</span> Assets Checklist</button>
       <button class="nav-btn" data-section="contracts"><span class="icon">◻</span> Contracts</button>
       <button class="nav-btn" data-section="payees" style="display:none;"><span class="icon">👤</span> Payees</button>
@@ -2003,6 +2003,7 @@
           <button class="active" data-area="all">All</button>
           <button data-area="Legal">Legal</button>
           <button data-area="Onboarding">Onboarding</button>
+          <button data-area="Upload">Upload</button>
           <button data-area="Other">Other</button>
         </div>
 
@@ -3000,14 +3001,14 @@
       { area: 'Onboarding',title: 'Bio / Artist Statement',         sort: 30 },
       { area: 'Onboarding',title: 'Audio Master (Original)',        sort: 40 },
       { area: 'Onboarding',title: 'Audio Master (Radio Edit)',      sort: 50 },
-      { area: 'Onboarding',title: 'Traxsource Upload',              sort: 60 },
-      { area: 'Onboarding',title: 'Beatport Upload',                sort: 70 },
-      { area: 'Onboarding',title: 'DSP Upload',                     sort: 80 },
-      { area: 'Onboarding',title: 'Pitch Copy / PR Notes',          sort: 90 },
+      { area: 'Onboarding',title: 'Pitch Copy / PR Notes',          sort: 60 },
+      { area: 'Upload',    title: 'Traxsource Upload',              sort: 10 },
+      { area: 'Upload',    title: 'Beatport Upload',                sort: 20 },
+      { area: 'Upload',    title: 'DSP Upload',                     sort: 30 },
       { area: 'Other',     title: 'Miscellaneous Notes / Links',    sort: 10 },
     ];
 
-    const ALL_AREAS = ['Legal','Onboarding','Other'];
+    const ALL_AREAS = ['Legal','Onboarding','Upload','Other'];
     const ASSET_OPTIONAL_DEFAULTS = new Set([
       'Legal|Sync Clearances (if applicable)',
       'Other|Miscellaneous Notes / Links'
@@ -3016,8 +3017,10 @@
     // JS-side lookup key: keeps area and title separate in DB, combined in JS
     function rowKey(area, title) { return area + '|' + title; }
 
-    function normalizeAssetArea(area) {
+    function normalizeAssetArea(area, title) {
       const raw = String(area || '').trim();
+      const t = normalizeAssetTitle(title || '');
+      if (t === 'Traxsource Upload' || t === 'Beatport Upload' || t === 'DSP Upload') return 'Upload';
       if (raw === 'Creative' || raw === 'Copy' || raw === 'Technical') return 'Onboarding';
       return raw;
     }
@@ -3580,7 +3583,7 @@
       const map = {};
       (assetsData || []).forEach(function(a) {
         if (a.area && a.asset_title) {
-          const normalizedArea = normalizeAssetArea(a.area);
+          const normalizedArea = normalizeAssetArea(a.area, a.asset_title);
           const normalizedTitle = normalizeAssetTitle(a.asset_title);
           const normalizedRow = Object.assign({}, a, {
             area: normalizedArea,
@@ -3612,7 +3615,7 @@
         const customItems = (assetsData || [])
           .map(function(a) {
             return Object.assign({}, a, {
-              area: normalizeAssetArea(a.area),
+              area: normalizeAssetArea(a.area, a.asset_title),
               asset_title: normalizeAssetTitle(a.asset_title)
             });
           })
@@ -3881,9 +3884,9 @@
 
     function uploadConfirmationReceived(assetsCache) {
       return (assetsCache || []).some(function(a) {
-        const area = normalizeAssetArea(a && a.area);
+        const area = normalizeAssetArea(a && a.area, a && a.asset_title);
         const title = normalizeAssetTitle(a && a.asset_title);
-        if (area === 'Onboarding' && (title === 'Traxsource Upload' || title === 'Beatport Upload' || title === 'DSP Upload')) {
+        if (area === 'Upload' && (title === 'Traxsource Upload' || title === 'Beatport Upload' || title === 'DSP Upload')) {
           return a && a.received === true;
         }
         return String(a && a.area || '') === 'Technical' && String(a && a.asset_title || '') === 'Upload Confirmation' && a && a.received === true;
@@ -4465,7 +4468,7 @@
       const customItems = (assetsData || [])
         .map(function(a) {
           return Object.assign({}, a, {
-            area: normalizeAssetArea(a.area),
+            area: normalizeAssetArea(a.area, a.asset_title),
             asset_title: normalizeAssetTitle(a.asset_title)
           });
         })
@@ -4720,7 +4723,7 @@
         const customItems = (assetsData || [])
           .map(function(a) {
             return Object.assign({}, a, {
-              area: normalizeAssetArea(a.area),
+              area: normalizeAssetArea(a.area, a.asset_title),
               asset_title: normalizeAssetTitle(a.asset_title)
             });
           })
@@ -4963,7 +4966,7 @@
     const WORKFLOW_HELP = {
       'Contract Returned': 'Reminder: check Legal > Contract PDF (Signed) in Assets Checklist.',
       'Create Label Copy': 'Reminder: check Onboarding > Label Copy in Assets Checklist.',
-      'Complete Uploads': 'Reminder: check Onboarding > Traxsource Upload, Beatport Upload, DSP Upload.'
+      'Complete Uploads': 'Reminder: check Upload > Traxsource Upload, Beatport Upload, DSP Upload.'
     };
     const elWorkflowReleaseSelect = document.getElementById('workflow-release-select');
     const elWorkflowLoadStatus = document.getElementById('workflow-load-status');

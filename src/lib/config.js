@@ -20,8 +20,8 @@ export const ROUTE_META = {
 export const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/actions', label: 'Actions' },
-  { href: '/releases', label: 'Release Pipeline' },
   { href: '/workflow', label: 'Workflow Suite' },
+  { href: '/releases', label: 'Release Pipeline' },
   { href: '/assets', label: 'Assets Checklist' },
   { href: '/contracts', label: 'Contracts' },
   { href: '/qa', label: 'Quality Assurance' },
