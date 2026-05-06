@@ -1088,7 +1088,7 @@
     }
     .dash-group-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
       align-items: start;
     }
@@ -1137,7 +1137,7 @@
     .tag-followup { background: #fffbeb; color: #92400e; }
     .tag-soon     { background: #f0fdf4; color: #166534; }
     .tag-contract { background: #f5f3ff; color: #6d28d9; }
-    @media (max-width: 1200px) {
+    @media (max-width: 900px) {
       .dash-group-grid { grid-template-columns: 1fr; }
       .dash-body { max-height: none; }
     }
