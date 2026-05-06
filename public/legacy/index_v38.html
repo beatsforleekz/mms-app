@@ -1071,51 +1071,76 @@
     .data-table tbody tr.editing td { background: var(--accent-lt) !important; }
 
     /* ── v36 Dashboard ── */
+    .dashboard-layout { display: grid; gap: 16px; }
+    .dash-group {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+    }
+    .dash-group-head {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin: 2px 4px 10px;
+    }
+    .dash-group-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: 10px;
+      align-items: start;
+    }
     .dash-section {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      margin-bottom: 16px;
       overflow: hidden;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
     .dash-section-header {
-      padding: 11px 16px;
+      padding: 10px 14px;
       background: var(--bg);
       border-bottom: 1px solid var(--border);
       display: flex; align-items: center; gap: 10px;
     }
     .dash-section-title {
-      font-size: 12px; font-weight: 700; text-transform: uppercase;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: .06em; color: var(--muted); flex: 1;
     }
     .dash-count {
-      font-size: 11px; font-weight: 700; padding: 1px 8px;
+      font-size: 11px; font-weight: 700; padding: 2px 8px;
       border-radius: 10px; background: var(--accent-lt); color: var(--accent);
     }
-    .dash-count.zero { background: var(--bg); color: var(--muted); }
-    .dash-body { padding: 0; }
+    .dash-count.zero { background: #eef2f7; color: #64748b; }
+    .dash-body { padding: 0; max-height: 265px; overflow: auto; }
     .dash-empty {
-      padding: 14px 16px; font-size: 13px; color: var(--muted); font-style: italic;
+      padding: 12px 14px; font-size: 12px; color: var(--muted); font-style: italic;
     }
     .dash-row {
       display: flex; align-items: flex-start; gap: 10px;
-      padding: 10px 16px; border-bottom: 1px solid var(--border);
-      font-size: 13px;
+      padding: 9px 14px; border-bottom: 1px solid var(--border);
+      font-size: 12.5px;
     }
     .dash-row:last-child { border-bottom: none; }
-    .dash-row:hover { background: var(--bg); }
+    .dash-row:hover { background: #f8fafc; }
     .dash-row-body { flex: 1; }
     .dash-row-title { font-weight: 500; }
-    .dash-row-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .dash-row-meta { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
     .dash-row-tag {
       font-size: 10px; font-weight: 700; padding: 2px 7px;
       border-radius: 4px; white-space: nowrap; flex-shrink: 0;
     }
     .tag-today    { background: var(--accent-lt); color: var(--accent); }
     .tag-overdue  { background: #fef2f2; color: #991b1b; }
-    .tag-chase    { background: #fffbeb; color: #92400e; }
+    .tag-followup { background: #fffbeb; color: #92400e; }
     .tag-soon     { background: #f0fdf4; color: #166534; }
     .tag-contract { background: #f5f3ff; color: #6d28d9; }
+    @media (max-width: 1200px) {
+      .dash-group-grid { grid-template-columns: 1fr; }
+      .dash-body { max-height: none; }
+    }
 
     /* ── Statement Tracker ── */
     .stmt-period-bar {
@@ -1644,8 +1669,12 @@
 
       <!-- DASHBOARD -->
       <section id="section-dashboard" class="section active">
-        <div class="section-header"><h2>Dashboard</h2><p>Today's actions, overdue items, what needs chasing, and upcoming deadlines.</p></div>
+        <div class="section-header"><h2>Dashboard</h2><p>Today's actions, overdue items, what needs follow up, and upcoming deadlines.</p></div>
         <hr class="divider" />
+        <div class="dashboard-layout">
+          <div class="dash-group">
+            <div class="dash-group-head">To Do</div>
+            <div class="dash-group-grid">
 
         <!-- 1. Today Actions -->
         <div class="dash-section">
@@ -1664,34 +1693,82 @@
           </div>
           <div class="dash-body" id="dash-overdue-body"><div class="dash-empty">Nothing overdue.</div></div>
         </div>
+            </div>
+          </div>
 
-        <!-- 3. Items that need chasing -->
+          <div class="dash-group">
+            <div class="dash-group-head">Follow Up</div>
+            <div class="dash-group-grid">
+        <!-- 3. Items that need follow up -->
         <div class="dash-section">
           <div class="dash-section-header">
-            <span class="dash-section-title">🔔 Items Needing Chase</span>
+            <span class="dash-section-title">🔔 Items Needing Follow Up</span>
             <span class="dash-count zero" id="dash-chase-count">0</span>
           </div>
-          <div class="dash-body" id="dash-chase-body"><div class="dash-empty">No items marked as Chase.</div></div>
+          <div class="dash-body" id="dash-chase-body"><div class="dash-empty">No items marked for follow up.</div></div>
         </div>
+            </div>
+          </div>
 
-        <!-- 4. Contracts that need chasing -->
+          <div class="dash-group">
+            <div class="dash-group-head">Workflow</div>
+            <div class="dash-group-grid">
         <div class="dash-section">
           <div class="dash-section-header">
-            <span class="dash-section-title">📄 Contracts Needing Chase</span>
+            <span class="dash-section-title">⚙ Workflow In Progress</span>
+            <span class="dash-count zero" id="dash-workflow-progress-count">0</span>
+          </div>
+          <div class="dash-body" id="dash-workflow-progress-body"><div class="dash-empty">No workflow steps in progress.</div></div>
+        </div>
+
+        <div class="dash-section">
+          <div class="dash-section-header">
+            <span class="dash-section-title">⛔ Workflow Blocked</span>
+            <span class="dash-count zero" id="dash-workflow-blocked-count">0</span>
+          </div>
+          <div class="dash-body" id="dash-workflow-blocked-body"><div class="dash-empty">No blocked workflow items.</div></div>
+        </div>
+            </div>
+          </div>
+
+          <div class="dash-group">
+            <div class="dash-group-head">Contracts</div>
+            <div class="dash-group-grid">
+        <!-- 4. Contracts that need follow up -->
+        <div class="dash-section">
+          <div class="dash-section-header">
+            <span class="dash-section-title">📄 Contracts Needing Follow Up</span>
             <span class="dash-count zero" id="dash-contracts-chase-count">0</span>
           </div>
           <div class="dash-body" id="dash-contracts-chase-body"><div class="dash-empty">No contracts awaiting signature.</div></div>
         </div>
 
-        <!-- 5. Due in next 7 days -->
         <div class="dash-section">
           <div class="dash-section-header">
-            <span class="dash-section-title">📅 Due in Next 7 Days</span>
-            <span class="dash-count zero" id="dash-soon-count">0</span>
+            <span class="dash-section-title">📝 Missing Signed Contracts</span>
+            <span class="dash-count zero" id="dash-missing-signed-count">0</span>
           </div>
-          <div class="dash-body" id="dash-soon-body"><div class="dash-empty">Nothing due in the next 7 days.</div></div>
+          <div class="dash-body" id="dash-missing-signed-body"><div class="dash-empty">All tracked releases have signed contracts.</div></div>
         </div>
+            </div>
+          </div>
 
+          <div class="dash-group">
+            <div class="dash-group-head">Assets</div>
+            <div class="dash-group-grid">
+        <div class="dash-section">
+          <div class="dash-section-header">
+            <span class="dash-section-title">📦 Incomplete Required Assets</span>
+            <span class="dash-count zero" id="dash-assets-incomplete-count">0</span>
+          </div>
+          <div class="dash-body" id="dash-assets-incomplete-body"><div class="dash-empty">No incomplete required assets.</div></div>
+        </div>
+            </div>
+          </div>
+
+          <div class="dash-group">
+            <div class="dash-group-head">Statements</div>
+            <div class="dash-group-grid">
         <!-- 6. Statements summary -->
         <div class="dash-section">
           <div class="dash-section-header">
@@ -1699,6 +1776,9 @@
             <span class="dash-count zero" id="dash-stmt-count">0</span>
           </div>
           <div class="dash-body" id="dash-stmt-body"><div class="dash-empty">No statement entries yet.</div></div>
+        </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -2411,7 +2491,7 @@
               <select class="action-edit-select" id="ae-status">
                 <option value="open">Open</option>
                 <option value="in_progress">In Progress</option>
-                <option value="Chase">Chase</option>
+                <option value="Chase">Follow Up</option>
                 <option value="blocked">Blocked</option>
                 <option value="done">Done</option>
               </select>
@@ -2465,7 +2545,7 @@
           <select id="action-status-input" title="Status">
             <option value="open">Open</option>
             <option value="in_progress">In Progress</option>
-            <option value="Chase">Chase</option>
+            <option value="Chase">Follow Up</option>
             <option value="blocked">Blocked</option>
             <option value="done">Done</option>
           </select>
@@ -4975,9 +5055,31 @@
     const elWorkflowList = document.getElementById('workflow-list');
     let currentWorkflowReleaseId = '';
     let currentWorkflowRows = [];
+    if (elWorkflowSaveBtn) elWorkflowSaveBtn.disabled = true;
     function workflowSetStatus(msg) {
       if (!elWorkflowLoadStatus) return;
       elWorkflowLoadStatus.textContent = msg || '';
+    }
+    function workflowApplyStatusStyle(selectEl, value) {
+      if (!selectEl) return;
+      const v = String(value || '');
+      if (v === 'Done') {
+        selectEl.style.background = '#ecfdf5';
+        selectEl.style.borderColor = '#86efac';
+        selectEl.style.color = '#065f46';
+      } else if (v === 'Blocked') {
+        selectEl.style.background = '#fef2f2';
+        selectEl.style.borderColor = '#fca5a5';
+        selectEl.style.color = '#991b1b';
+      } else if (v === 'In Progress') {
+        selectEl.style.background = '#eff6ff';
+        selectEl.style.borderColor = '#93c5fd';
+        selectEl.style.color = '#1d4ed8';
+      } else {
+        selectEl.style.background = '#fff';
+        selectEl.style.borderColor = 'var(--border)';
+        selectEl.style.color = 'var(--text)';
+      }
     }
     function workflowStepKey(step) {
       return String(step || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -5098,9 +5200,11 @@
         });
         statusSel.addEventListener('change', function() {
           currentWorkflowRows[idx].status = statusSel.value;
-          workflowSetStatus('');
+          workflowApplyStatusStyle(statusSel, statusSel.value);
+          workflowSetStatus('Unsaved changes');
           workflowRenderCurrentRows();
         });
+        workflowApplyStatusStyle(statusSel, row.status);
         statusCell.appendChild(statusSel);
         const dueCell = document.createElement('div'); dueCell.className = 'checklist-cell';
         const due = document.createElement('input');
@@ -5112,7 +5216,7 @@
         due.style.borderRadius = '4px';
         due.addEventListener('change', function() {
           currentWorkflowRows[idx].due_date = normalizeDateValue(due.value || '');
-          workflowSetStatus('');
+          workflowSetStatus('Unsaved changes');
         });
         dueCell.appendChild(due);
         const notesCell = document.createElement('div'); notesCell.className = 'checklist-cell';
@@ -5126,7 +5230,7 @@
         notes.style.borderRadius = '4px';
         notes.addEventListener('change', function() {
           currentWorkflowRows[idx].notes = notes.value || '';
-          workflowSetStatus('');
+          workflowSetStatus('Unsaved changes');
         });
         notesCell.appendChild(notes);
         table.append(num, step, statusCell, dueCell, notesCell);
@@ -5160,8 +5264,10 @@
           currentWorkflowRows = [];
           workflowRenderCurrentRows();
           workflowSetStatus('');
+          if (elWorkflowSaveBtn) elWorkflowSaveBtn.disabled = true;
           return;
         }
+        if (elWorkflowSaveBtn) elWorkflowSaveBtn.disabled = false;
         workflowSetStatus('Loading…');
         try {
           currentWorkflowRows = await workflowLoadRows(currentWorkflowReleaseId);
@@ -6925,7 +7031,7 @@
       const groups = [
         { key: 'open', label: 'Open' },
         { key: 'in_progress', label: 'In Progress' },
-        { key: 'Chase', label: 'Chase' },
+        { key: 'Chase', label: 'Follow Up' },
         { key: 'blocked', label: 'Blocked' },
         { key: 'done', label: 'Done' },
       ];
@@ -6995,7 +7101,7 @@
 
           const statusWrap = document.createElement('div');
           statusWrap.className = 'action-status-cell';
-          const statusLabels = { open:'Open', done:'Done', in_progress:'In Progress', blocked:'Blocked', Chase:'Chase' };
+          const statusLabels = { open:'Open', done:'Done', in_progress:'In Progress', blocked:'Blocked', Chase:'Follow Up' };
           const statusCls = isDone ? 'action-badge-done' : a.status === 'Chase' ? 'action-badge-chase' : 'action-badge-open';
           statusWrap.innerHTML = '<span class="' + statusCls + '">' + (statusLabels[a.status] || a.status || 'Open') + '</span>';
 
@@ -7426,7 +7532,7 @@
     //  DASHBOARD (v36) — renders all 6 sections
     // ══════════════════════════════════════════════════════════════════════════
 
-    function renderDashboard() {
+    async function renderDashboard() {
       const today = new Date(); today.setHours(0,0,0,0);
       const in7   = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
@@ -7484,17 +7590,17 @@
         }));
       setSection('dash-overdue-body', 'dash-overdue-count', overdueRows);
 
-      // ── 3. Chase ──
+      // ── 3. Follow Up ──
       const chaseRows = allActions
         .filter(a => String(a.status||'') === 'Chase')
         .map(a => ({
-          tag:'Chase', tagCls:'tag-chase',
+          tag:'Follow Up', tagCls:'tag-followup',
           title: a.title,
           meta: [a.related_to, a.reference_name, releaseTitleForId(a.release_id), a.due_date ? fmtDue(a.due_date) : ''].filter(Boolean).join(' · '),
         }));
       setSection('dash-chase-body', 'dash-chase-count', chaseRows);
 
-      // ── 4. Contracts needing chase (Sent/Pending, not yet received) ──
+      // ── 4. Contracts needing follow up (Sent/Pending, not yet received) ──
       const contractChaseRows = (allContracts || [])
         .filter(c => {
           if (!contractParticipatesInRoyalties(c)) return false;
@@ -7510,6 +7616,85 @@
           };
         });
       setSection('dash-contracts-chase-body', 'dash-contracts-chase-count', contractChaseRows);
+
+      // ── 4b. Workflow overview ──
+      let workflowData = [];
+      if (db) {
+        try {
+          const { data, error } = await db
+            .from('workflow_steps')
+            .select('release_id,step_order,step_title,status,updated_at')
+            .order('updated_at', { ascending: false })
+            .limit(5000);
+          if (!error) workflowData = data || [];
+        } catch (err) {}
+      }
+      const byRelease = {};
+      (workflowData || []).forEach(function(row) {
+        const rid = String(row && row.release_id || '');
+        if (!rid) return;
+        if (!byRelease[rid]) byRelease[rid] = [];
+        byRelease[rid].push(row);
+      });
+      const workflowProgressRows = Object.keys(byRelease).map(function(rid) {
+        const rows = (byRelease[rid] || []).slice().sort(function(a, b) {
+          return Number(a && a.step_order || 0) - Number(b && b.step_order || 0);
+        });
+        const inProgress = rows.find(function(r) { return String(r && r.status || '') === 'In Progress'; });
+        if (!inProgress) return null;
+        const blockedCount = rows.filter(function(r) { return String(r && r.status || '') === 'Blocked'; }).length;
+        return {
+          tag: 'Workflow',
+          tagCls: 'tag-soon',
+          title: releaseTitleForId(rid) || ('Release #' + rid),
+          meta: inProgress.step_title + (blockedCount ? (' · ' + blockedCount + ' blocked') : '')
+        };
+      }).filter(Boolean);
+      setSection('dash-workflow-progress-body', 'dash-workflow-progress-count', workflowProgressRows);
+
+      const workflowBlockedRows = Object.keys(byRelease).map(function(rid) {
+        const rows = byRelease[rid] || [];
+        const blockedRows = rows.filter(function(r) { return String(r && r.status || '') === 'Blocked'; });
+        if (!blockedRows.length) return null;
+        return {
+          tag: 'Blocked',
+          tagCls: 'tag-overdue',
+          title: releaseTitleForId(rid) || ('Release #' + rid),
+          meta: blockedRows.length + ' blocked step' + (blockedRows.length === 1 ? '' : 's')
+        };
+      }).filter(Boolean);
+      setSection('dash-workflow-blocked-body', 'dash-workflow-blocked-count', workflowBlockedRows);
+
+      // ── 4c. Missing signed contracts + incomplete required assets ──
+      const missingSignedRows = (currentReleasesData || []).filter(function(r) {
+        return !signedContractExistsForRelease(r);
+      }).map(function(r) {
+        return {
+          tag: 'Contract',
+          tagCls: 'tag-contract',
+          title: pipelineDisplayName(r) || (r && r.title) || '—',
+          meta: 'No signed contract linked'
+        };
+      });
+      setSection('dash-missing-signed-body', 'dash-missing-signed-count', missingSignedRows);
+
+      const incompleteAssetsRows = (currentReleasesData || []).filter(function(r) {
+        const assets = getCachedAssetsForRelease(r);
+        if (!Array.isArray(assets) || !assets.length) return false;
+        const comp = computeCompletion(assets);
+        return comp && comp.overall === false;
+      }).map(function(r) {
+        const assets = getCachedAssetsForRelease(r) || [];
+        const comp = computeCompletion(assets);
+        const pendingAreas = ALL_AREAS.filter(function(area) { return !comp[area]; });
+        return {
+          tag: 'Assets',
+          tagCls: 'tag-followup',
+          title: pipelineDisplayName(r) || (r && r.title) || '—',
+          meta: pendingAreas.length ? ('Pending: ' + pendingAreas.join(', ')) : 'Required assets incomplete'
+        };
+      });
+      setSection('dash-assets-incomplete-body', 'dash-assets-incomplete-count', incompleteAssetsRows);
 
       // ── 5. Due in next 7 days ──
       const soonRows = allActions

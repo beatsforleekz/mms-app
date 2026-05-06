@@ -4,7 +4,7 @@ export const SUPABASE_ANON_KEY = 'sb_publishable_50qTJH-gY--FKXu4babiog_WI1iMJ5k
 export const LEGACY_SECTION_PATH = '/legacy/index_v38.html';
 
 export const ROUTE_META = {
-  '/dashboard': { title: 'Dashboard', subtitle: "Today's actions, overdue items, what needs chasing, and upcoming deadlines." },
+  '/dashboard': { title: 'Dashboard', subtitle: "Today's actions, overdue items, what needs follow up, and upcoming deadlines." },
   '/releases': { title: 'Release Pipeline', subtitle: 'Full release tracking with dedicated release record views.' },
   '/catalogues': { title: 'Catalogues', subtitle: 'Structured catalogue views for label and publishing records.' },
   '/assets': { title: 'Assets Checklist', subtitle: 'Per-release asset checklist and linked delivery status.' },

@@ -9,7 +9,7 @@ import { actionTodayBool, compareActions, formatDate } from '@/lib/utils/format'
 const STATUS_OPTIONS = [
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'Chase', label: 'Chase' },
+  { value: 'Chase', label: 'Follow Up' },
   { value: 'blocked', label: 'Blocked' },
   { value: 'done', label: 'Done' }
 ];
@@ -17,7 +17,7 @@ const STATUS_OPTIONS = [
 const GROUPS = [
   { key: 'open', label: 'Open' },
   { key: 'in_progress', label: 'In Progress' },
-  { key: 'Chase', label: 'Chase' },
+  { key: 'Chase', label: 'Follow Up' },
   { key: 'blocked', label: 'Blocked' },
   { key: 'done', label: 'Done' }
 ];
