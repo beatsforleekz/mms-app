@@ -280,6 +280,22 @@ export default function ActionsWorkspace() {
     }
   }
 
+  async function handleMarkSelectedToday() {
+    const selected = visibleActions.filter((action) => selectedIds.has(action.id));
+    if (!selected.length) return;
+    setError('');
+    try {
+      const updatedRows = await Promise.all(selected.map((action) => updateAction(action.id, {
+        ...action,
+        to_do_today: true
+      })));
+      const byId = new Map(updatedRows.map((row) => [row.id, row]));
+      setActions((prev) => prev.map((row) => byId.get(row.id) || row));
+    } catch (err) {
+      setError(err?.message || 'Failed to mark selected actions for Today.');
+    }
+  }
+
   return (
     <section className="screen">
       <ScreenHeader
@@ -317,6 +333,7 @@ export default function ActionsWorkspace() {
             <div className="actions-head-tools">
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{selectedIds.size} selected</span>
               <button type="button" className="shell-btn" onClick={() => setSelectedIds(new Set())}>Clear Selection</button>
+              <button type="button" className="shell-btn" onClick={handleMarkSelectedToday}>Mark Selected For Today</button>
               <button type="button" className="shell-btn" onClick={handleDeleteSelected}>Delete Selected</button>
             </div>
           ) : null}
