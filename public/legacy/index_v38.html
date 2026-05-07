@@ -3302,6 +3302,8 @@
     const PIPELINE_REFERENCE_STORAGE_KEY = 'catalogue_pipeline_links';
     let labelCatalogueData = [];
     let publishingCatalogueData = [];
+    let parentReleaseData = [];
+    let parentReleaseTracksMap = {};
     let pipelineReferenceEntriesCache = [];
 
     function lsReadArray(key) {
@@ -3373,6 +3375,15 @@
       };
     }
 
+    function normalizeParentReleaseRow(row) {
+      return {
+        id: catalogueNormalizeText(row && row.id),
+        title: catalogueNormalizeText(row && row.title),
+        release_type: catalogueNormalizeText(row && row.release_type),
+        status: catalogueNormalizeText(row && row.status) || 'New'
+      };
+    }
+
     function getLabelCatalogueRows() {
       return (labelCatalogueData || []).slice();
     }
@@ -3381,21 +3392,44 @@
       return (publishingCatalogueData || []).slice();
     }
 
+    function getParentReleaseRows() {
+      return (parentReleaseData || []).slice();
+    }
+
     async function fetchCatalogueLookupData() {
       if (!db) return;
-      const [labelRes, publishingRes] = await Promise.all([
+      const [labelRes, publishingRes, parentRes, parentTracksRes] = await Promise.all([
         db.from('label_catalogue').select('id,artist,track_title,version,release_title,isrc').order('artist', { ascending: true }).limit(5000),
-        db.from('publishing_catalogue').select('id,work_title,writers,tempo_id,iswc').order('work_title', { ascending: true }).limit(5000)
+        db.from('publishing_catalogue').select('id,work_title,writers,tempo_id,iswc').order('work_title', { ascending: true }).limit(5000),
+        db.from('parent_releases').select('id,title,release_type,status').order('created_at', { ascending: false }).limit(1000),
+        db.from('parent_release_tracks').select('id,parent_release_id,child_catalogue_type,child_catalogue_id,track_order').order('track_order', { ascending: true }).limit(10000)
       ]);
       if (labelRes.error) throw labelRes.error;
       if (publishingRes.error) throw publishingRes.error;
       labelCatalogueData = (labelRes.data || []).map(normalizeLabelCatalogueRow).filter(function(row) { return row.id; });
       publishingCatalogueData = (publishingRes.data || []).map(normalizePublishingCatalogueRow).filter(function(row) { return row.id; });
+      if (parentRes && parentRes.error) throw parentRes.error;
+      if (parentTracksRes && parentTracksRes.error) throw parentTracksRes.error;
+      parentReleaseData = ((parentRes && parentRes.data) || []).map(normalizeParentReleaseRow).filter(function(row) { return row.id; });
+      parentReleaseTracksMap = {};
+      ((parentTracksRes && parentTracksRes.data) || []).forEach(function(row) {
+        const parentId = catalogueNormalizeText(row && row.parent_release_id);
+        if (!parentId) return;
+        if (!parentReleaseTracksMap[parentId]) parentReleaseTracksMap[parentId] = [];
+        parentReleaseTracksMap[parentId].push({
+          id: catalogueNormalizeText(row && row.id),
+          parent_release_id: parentId,
+          child_catalogue_type: 'label',
+          child_catalogue_id: catalogueNormalizeText(row && row.child_catalogue_id),
+          track_order: Number(row && row.track_order) || 0
+        });
+      });
     }
 
     function normalizePipelineReferenceEntries(rows) {
       return (rows || []).map(function(row) {
-        const type = catalogueNormalizeText(row && row.catalogue_type).toLowerCase() === 'publishing' ? 'publishing' : 'label';
+        const rawType = catalogueNormalizeText(row && row.catalogue_type).toLowerCase();
+        const type = rawType === 'publishing' ? 'publishing' : (rawType === 'parent' ? 'parent' : 'label');
         const catalogueId = catalogueNormalizeText(row && row.catalogue_id);
         return {
           id: catalogueNormalizeText(row && row.id) || ('catalogue:' + type + ':' + catalogueId),
@@ -3427,16 +3461,18 @@
     }
 
     function resolveCatalogueRow(catalogueType, catalogueId) {
-      const type = catalogueNormalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
+      const rawType = catalogueNormalizeText(catalogueType).toLowerCase();
+      const type = rawType === 'publishing' ? 'publishing' : (rawType === 'parent' ? 'parent' : 'label');
       const id = catalogueNormalizeText(catalogueId);
-      const rows = type === 'publishing' ? getPublishingCatalogueRows() : getLabelCatalogueRows();
+      const rows = type === 'publishing' ? getPublishingCatalogueRows() : (type === 'parent' ? getParentReleaseRows() : getLabelCatalogueRows());
       const found = rows.find(function(row) { return String(row.id) === String(id); }) || null;
       console.log('[Pipeline Catalogue Lookup]', { catalogue_type: type, catalogue_id: id, lookup_result: found ? found.id : null });
       return found;
     }
 
     function pipelineEntryExistsForCatalogue(catalogueType, catalogueId) {
-      const type = catalogueNormalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
+      const rawType = catalogueNormalizeText(catalogueType).toLowerCase();
+      const type = rawType === 'publishing' ? 'publishing' : (rawType === 'parent' ? 'parent' : 'label');
       const id = catalogueNormalizeText(catalogueId);
       return getPipelineReferenceEntries().some(function(entry) {
         return entry.catalogue_type === type && entry.catalogue_id === id;
@@ -3444,7 +3480,8 @@
     }
 
     async function createPipelineReferenceEntry(catalogueType, catalogueId, status) {
-      const type = catalogueNormalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
+      const rawType = catalogueNormalizeText(catalogueType).toLowerCase();
+      const type = rawType === 'publishing' ? 'publishing' : (rawType === 'parent' ? 'parent' : 'label');
       const id = catalogueNormalizeText(catalogueId);
       if (!id) throw new Error('Missing catalogue id');
       const source = resolveCatalogueRow(type, id);
@@ -3518,6 +3555,15 @@
     function buildPipelineReferenceRow(entry) {
       const meta = getReleaseMeta(entry.id);
       const source = resolveCatalogueRow(entry.catalogue_type, entry.catalogue_id);
+      const parentTracks = parentReleaseTracksMap[String(entry.catalogue_id)] || [];
+      const parentChildRows = parentTracks.map(function(track) {
+        return resolveCatalogueRow('label', track.child_catalogue_id) || {
+          id: track.child_catalogue_id,
+          track_title: track.child_catalogue_id,
+          artist: '',
+          version: ''
+        };
+      });
       if (!source) {
         return {
           id: entry.id,
@@ -3540,7 +3586,36 @@
           is_catalogue_reference: true,
           missing_catalogue_data: true,
           catalogue_id: entry.catalogue_id,
-          catalogue_type: entry.catalogue_type
+          catalogue_type: entry.catalogue_type,
+          child_tracks: [],
+          parent_release_type: ''
+        };
+      }
+      if (entry.catalogue_type === 'parent') {
+        return {
+          id: entry.id,
+          internal_id: meta.internal_id || '',
+          title: meta.title || source.title || '—',
+          artist: meta.artist || 'Various Artists',
+          type: meta.type || source.release_type || 'EP',
+          company_role: meta.company_role || 'Label',
+          status: entry.status || source.status || 'New',
+          raw_status: entry.status || 'New',
+          release_date: meta.release_date || null,
+          owner: '',
+          notes: meta.notes || '',
+          isrc: meta.isrc || '',
+          contract_received: meta.contract_received === true,
+          registrations_complete: meta.registrations_complete === true,
+          uploads_complete: meta.uploads_complete === true,
+          added_to_pub_cat: meta.added_to_pub_cat === true,
+          registered_with_sony: meta.registered_with_sony === true,
+          is_catalogue_reference: true,
+          missing_catalogue_data: false,
+          catalogue_id: entry.catalogue_id,
+          catalogue_type: entry.catalogue_type,
+          child_tracks: parentChildRows,
+          parent_release_type: source.release_type || ''
         };
       }
       if (entry.catalogue_type === 'publishing') {
@@ -3565,7 +3640,9 @@
           is_catalogue_reference: true,
           missing_catalogue_data: false,
           catalogue_id: entry.catalogue_id,
-          catalogue_type: entry.catalogue_type
+          catalogue_type: entry.catalogue_type,
+          child_tracks: [],
+          parent_release_type: ''
         };
       }
       return {
@@ -3589,7 +3666,9 @@
         is_catalogue_reference: true,
         missing_catalogue_data: false,
         catalogue_id: entry.catalogue_id,
-        catalogue_type: entry.catalogue_type
+        catalogue_type: entry.catalogue_type,
+        child_tracks: [],
+        parent_release_type: ''
       };
     }
 
@@ -4178,6 +4257,8 @@
           const checkedAttr = selectedReleaseIds.has(releaseIdStr) ? ' checked' : '';
           const titleDisplay = r.missing_catalogue_data ? 'Missing catalogue data' : (r.title || '—');
           const artistDisplay = r.artist || '—';
+          const parentLabel = r.catalogue_type === 'parent' ? (r.parent_release_type || r.type || 'Parent') : '';
+          const hasChildTracks = Array.isArray(r.child_tracks) && r.child_tracks.length > 0;
           const statusControlsHtml =
             '<label class="pipeline-status-toggle" title="Mark this release as released">' +
               '<input type="checkbox" data-release-override="released"' + (r.manual_status === 'Released' ? ' checked' : '') + ' />' +
@@ -4192,7 +4273,7 @@
           tr.innerHTML =
             '<td>' + (archivedView ? '' : '<input type="checkbox" data-release-select="' + releaseIdStr + '"' + checkedAttr + ' aria-label="Select release" />') + '</td>'+
             '<td class="col-id"><span class="id-display" title="' + rawId + '">' + shortId + '</span></td>'+
-            '<td class="col-title"><strong>'+escapeHtml(titleDisplay)+'</strong></td>'+
+            '<td class="col-title"><strong>'+escapeHtml(titleDisplay)+'</strong>' + (parentLabel ? '<span style="display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;background:#eef2ff;color:#3730a3;">'+escapeHtml(parentLabel)+'</span>' : '') + '</td>'+
             '<td class="col-artist">'+escapeHtml(artistDisplay)+'</td>'+
             '<td class="col-type">'+escapeHtml(r.type||'—')+'</td>'+
             '<td class="col-role">'+escapeHtml(r.company_role||'—')+'</td>'+
@@ -4202,7 +4283,7 @@
             '<td class="col-date">'+dt+'</td>'+
             '<td class="col-owner">'+escapeHtml(r.owner||'—')+'</td>'+
             '<td class="col-notes" title="'+ne+'">'+(ne||'—')+'</td>'+
-            '<td><div class="pipeline-row-actions">'+editBtnHtml+statusControlsHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></div></td>';
+            '<td><div class="pipeline-row-actions">' + (hasChildTracks ? '<button class="contract-row-btn pipeline-tracks-toggle-btn" data-id="'+r.id+'">Tracks</button>' : '') + editBtnHtml+statusControlsHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></div></td>';
 
           const selectEl = tr.querySelector('[data-release-select]');
           if (selectEl) {
@@ -4261,6 +4342,30 @@
             }
           });
           targetBody.appendChild(tr);
+
+          if (hasChildTracks) {
+            const childTr = document.createElement('tr');
+            childTr.dataset.parentTracksFor = String(r.id);
+            childTr.style.display = 'none';
+            const childList = r.child_tracks.map(function(track, index) {
+              const title = track && track.track_title ? track.track_title : ('Track ' + (index + 1));
+              const artist = track && track.artist ? track.artist : '';
+              const version = track && track.version ? (' · ' + track.version) : '';
+              const order = track && track.track_order ? (String(track.track_order) + '. ') : '';
+              return '<div style="padding:4px 0;border-bottom:1px dashed var(--border);"><strong>' + escapeHtml(order + title) + '</strong><span style="font-size:12px;color:var(--muted);margin-left:8px;">' + escapeHtml((artist || '—') + version) + '</span></div>';
+            }).join('');
+            childTr.innerHTML = '<td></td><td colspan="12" style="background:var(--bg);"><div style="padding:8px 10px;">' + childList + '</div></td>';
+            targetBody.appendChild(childTr);
+            const toggleBtn = tr.querySelector('.pipeline-tracks-toggle-btn');
+            if (toggleBtn) {
+              toggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const isHidden = childTr.style.display === 'none';
+                childTr.style.display = isHidden ? '' : 'none';
+                toggleBtn.textContent = isHidden ? 'Hide Tracks' : 'Tracks';
+              });
+            }
+          }
         });
         }
 
@@ -4978,16 +5083,24 @@
         refreshPipelineAssetCells();
         renderChecklist(currentReleaseId, currentAssets, currentActiveArea);
         elAssetsLoadStatus.textContent = 'Checklist saved';
+        if (elAssetsSaveAllBtn) {
+          elAssetsSaveAllBtn.textContent = 'Saved!';
+        }
       } catch (err) {
         const fullMsg = err.message || String(err);
         dbgA.saveError(fullMsg);
         elAssetsError.textContent = '⚠ Save failed: ' + fullMsg;
         elAssetsError.style.display = 'block';
-      } finally {
         if (elAssetsSaveAllBtn) {
-          elAssetsSaveAllBtn.disabled = false;
-          elAssetsSaveAllBtn.textContent = 'Save Checklist';
+          elAssetsSaveAllBtn.textContent = 'Could Not Save';
         }
+      } finally {
+        if (elAssetsSaveAllBtn) elAssetsSaveAllBtn.disabled = false;
+        setTimeout(function() {
+          if (elAssetsSaveAllBtn && !elAssetsSaveAllBtn.disabled) {
+            elAssetsSaveAllBtn.textContent = 'Save Checklist';
+          }
+        }, 1400);
       }
     }
 
@@ -5565,9 +5678,30 @@
 
     function contractCatalogueLabel(item) {
       if (!item) return '';
+      if (item.catalogue_type === 'parent') {
+        const artist = String(item.artist || '').trim();
+        const title = String(item.title || '—').trim();
+        const type = String(item.release_type || '').trim();
+        return (artist ? (artist + ' — ') : '') + title + (type ? (' — ' + type) : '');
+      }
       return item.catalogue_type === 'publishing'
         ? ((item.work_title || '—') + (item.writers ? (' — ' + item.writers) : ''))
         : ((item.artist || '—') + (item.track_title ? (' — ' + item.track_title) : ''));
+    }
+
+    function parentReleaseArtistForId(parentId) {
+      const pid = String(parentId || '');
+      if (!pid) return '';
+      const tracks = parentReleaseTracksMap[pid] || [];
+      const names = [];
+      tracks.forEach(function(track) {
+        const childId = String(track && track.child_catalogue_id || '');
+        if (!childId) return;
+        const source = (labelCatalogueData || []).find(function(row) { return String(row.id) === childId; });
+        const artist = String(source && source.artist || '').trim();
+        if (artist && names.indexOf(artist) === -1) names.push(artist);
+      });
+      return names.join(', ');
     }
 
     function contractCatalogueLinkKey(item) {
@@ -5577,7 +5711,8 @@
 
     function resolveContractCatalogueItem(catalogueId, catalogueType) {
       const id = String(catalogueId || '');
-      const type = String(catalogueType || '').toLowerCase() === 'publishing' ? 'publishing' : 'label';
+      const rawType = String(catalogueType || '').toLowerCase();
+      const type = rawType === 'publishing' ? 'publishing' : (rawType === 'parent' ? 'parent' : 'label');
       const match = (contractCatalogueOptions || []).find(function(item) {
         return String(item.catalogue_id) === id && String(item.catalogue_type) === type;
       });
@@ -5692,6 +5827,15 @@
         }))
         .concat((publishingCatalogueData || []).map(function(row) {
           return { catalogue_id: String(row.id), catalogue_type: 'publishing', work_title: row.work_title || '', writers: row.writers || '' };
+        }))
+        .concat((parentReleaseData || []).map(function(row) {
+          return {
+            catalogue_id: String(row.id),
+            catalogue_type: 'parent',
+            title: row.title || '',
+            release_type: row.release_type || '',
+            artist: parentReleaseArtistForId(row.id)
+          };
         }))
         .sort(function(a, b) {
           return String(contractCatalogueLabel(a) || '').localeCompare(String(contractCatalogueLabel(b) || ''), undefined, { sensitivity: 'base' });
@@ -6270,7 +6414,7 @@
     if (cfReleaseSearch) {
       cfReleaseSearch.addEventListener('focus', async function() {
         try {
-          if (!contractCatalogueOptions.length) await fetchContractCatalogueOptions();
+          await fetchContractCatalogueOptions();
           renderContractCatalogueResults(cfReleaseSearch.value || '');
         } catch (err) {
           setContractFeedback('⚠ Failed to load catalogue search.', 'error');
@@ -6281,7 +6425,7 @@
         if (cfCatalogueType) cfCatalogueType.value = '';
         if (cfRelease) cfRelease.value = '';
         try {
-          if (!contractCatalogueOptions.length) await fetchContractCatalogueOptions();
+          await fetchContractCatalogueOptions();
           renderContractCatalogueResults(cfReleaseSearch.value || '');
         } catch (err) {
           setContractFeedback('⚠ Failed to search catalogue.', 'error');

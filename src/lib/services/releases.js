@@ -32,7 +32,12 @@ async function getPipelineEntries() {
     id: normalizeText(row && (row.id || row.release_id)),
     release_id: normalizeText(row && row.release_id),
     catalogue_id: normalizeText(row && row.catalogue_id),
-    catalogue_type: normalizeText(row && row.catalogue_type).toLowerCase() === 'publishing' ? 'publishing' : 'label',
+    catalogue_type: (() => {
+      const type = normalizeText(row && row.catalogue_type).toLowerCase();
+      if (type === 'publishing') return 'publishing';
+      if (type === 'parent') return 'parent';
+      return 'label';
+    })(),
     status: normalizeText(row && row.status) || 'New'
   })).filter((row) => row.id && row.catalogue_id && row.catalogue_type);
 }
@@ -52,7 +57,12 @@ async function getCurrentUserId() {
 
 async function resolvePipelineEntry(releaseId, catalogueId = '', catalogueType = '') {
   const normalizedCatalogueId = normalizeText(catalogueId);
-  const normalizedCatalogueType = normalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
+  const normalizedCatalogueType = (() => {
+    const type = normalizeText(catalogueType).toLowerCase();
+    if (type === 'publishing') return 'publishing';
+    if (type === 'parent') return 'parent';
+    return 'label';
+  })();
   if (normalizedCatalogueId) {
     return {
       id: normalizeText(releaseId) || `catalogue:${normalizedCatalogueType}:${normalizedCatalogueId}`,
@@ -122,6 +132,15 @@ async function fetchCatalogueSource(entry) {
     if (error) throw error;
     return data ? { ...data, catalogue_type: 'publishing' } : null;
   }
+  if (entry.catalogue_type === 'parent') {
+    const { data, error } = await db
+      .from('parent_releases')
+      .select('id, title, release_type, status')
+      .eq('id', entry.catalogue_id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? { ...data, catalogue_type: 'parent' } : null;
+  }
   const { data, error } = await db
     .from('label_catalogue')
     .select('id, artist, track_title, version, release_title, isrc')
@@ -129,6 +148,46 @@ async function fetchCatalogueSource(entry) {
     .maybeSingle();
   if (error) throw error;
   return data ? { ...data, catalogue_type: 'label' } : null;
+}
+
+async function fetchParentChildTracks(parentReleaseId) {
+  const parentId = normalizeText(parentReleaseId);
+  if (!parentId) return [];
+  const db = getSupabaseClient();
+  const { data, error } = await db
+    .from('parent_release_tracks')
+    .select('id, parent_release_id, child_catalogue_type, child_catalogue_id, track_order')
+    .eq('parent_release_id', parentId)
+    .order('track_order', { ascending: true });
+  if (error) throw error;
+  const labelIds = Array.from(new Set((data || [])
+    .filter((row) => normalizeText(row.child_catalogue_type).toLowerCase() === 'label')
+    .map((row) => normalizeText(row.child_catalogue_id))
+    .filter(Boolean)));
+  let labelRows = [];
+  if (labelIds.length) {
+    const { data: labelData, error: labelError } = await db
+      .from('label_catalogue')
+      .select('id, artist, track_title, version, release_title, isrc')
+      .in('id', labelIds);
+    if (labelError) throw labelError;
+    labelRows = labelData || [];
+  }
+  const byId = new Map(labelRows.map((row) => [normalizeText(row.id), row]));
+  return (data || []).map((row) => {
+    const linked = byId.get(normalizeText(row.child_catalogue_id)) || null;
+    return {
+      id: normalizeText(row.id),
+      parent_release_id: normalizeText(row.parent_release_id),
+      child_catalogue_type: 'label',
+      child_catalogue_id: normalizeText(row.child_catalogue_id),
+      track_order: Number(row.track_order) || 0,
+      track_title: linked ? normalizeText(linked.track_title) : '',
+      artist: linked ? normalizeText(linked.artist) : '',
+      version: linked ? normalizeText(linked.version) : '',
+      isrc: linked ? normalizeText(linked.isrc) : ''
+    };
+  });
 }
 
 export async function fetchReleases() {
@@ -159,7 +218,27 @@ export async function fetchReleaseById(releaseId, catalogueId = '', catalogueTyp
       owner: savedMeta.owner || '',
       notes: savedNote || '',
       isrc: savedMeta.isrc || source.iswc || '',
-      missing_catalogue_data: false
+      missing_catalogue_data: false,
+      child_tracks: []
+    };
+  }
+  if (entry.catalogue_type === 'parent') {
+    const child_tracks = await fetchParentChildTracks(entry.catalogue_id);
+    return {
+      id: entry.id,
+      catalogue_id: entry.catalogue_id,
+      catalogue_type: entry.catalogue_type,
+      title: savedMeta.title || source.title || '—',
+      artist: savedMeta.artist || 'Various Artists',
+      type: savedMeta.type || source.release_type || 'EP',
+      company_role: savedMeta.company_role || 'Label',
+      status: entry.status || source.status || 'New',
+      release_date: savedMeta.release_date || null,
+      owner: savedMeta.owner || '',
+      notes: savedNote || '',
+      isrc: savedMeta.isrc || '',
+      missing_catalogue_data: false,
+      child_tracks
     };
   }
 
@@ -176,7 +255,8 @@ export async function fetchReleaseById(releaseId, catalogueId = '', catalogueTyp
     owner: savedMeta.owner || '',
     notes: savedNote || '',
     isrc: savedMeta.isrc || source.isrc || '',
-    missing_catalogue_data: false
+    missing_catalogue_data: false,
+    child_tracks: []
   };
 }
 

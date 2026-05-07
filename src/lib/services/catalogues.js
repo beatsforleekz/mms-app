@@ -7,6 +7,7 @@ const PIPELINE_LINKS_STORAGE_KEY = 'catalogue_pipeline_links';
 
 let labelCatalogueCache = [];
 let publishingCatalogueCache = [];
+let parentReleaseCache = [];
 
 function readStorageArray(key) {
   if (typeof window === 'undefined') return [];
@@ -45,6 +46,28 @@ function normalizePublishingRow(row) {
     writers: normalizeText(row.writers),
     tempo_id: normalizeText(row.tempo_id),
     iswc: normalizeText(row.iswc)
+  };
+}
+
+function normalizeParentReleaseRow(row) {
+  return {
+    id: normalizeText(row.id),
+    title: normalizeText(row.title),
+    release_type: normalizeText(row.release_type) || 'EP',
+    status: normalizeText(row.status) || 'New',
+    created_at: row && row.created_at ? String(row.created_at) : '',
+    updated_at: row && row.updated_at ? String(row.updated_at) : ''
+  };
+}
+
+function normalizeParentReleaseTrackRow(row) {
+  return {
+    id: normalizeText(row.id),
+    parent_release_id: normalizeText(row.parent_release_id),
+    child_catalogue_type: normalizeText(row.child_catalogue_type).toLowerCase() === 'label' ? 'label' : 'label',
+    child_catalogue_id: normalizeText(row.child_catalogue_id),
+    track_order: Number(row && row.track_order) || 0,
+    created_at: row && row.created_at ? String(row.created_at) : ''
   };
 }
 
@@ -210,6 +233,126 @@ export async function fetchPublishingCatalogue() {
   return publishingCatalogueCache.slice();
 }
 
+export async function fetchParentReleases() {
+  const db = getSupabaseClient();
+  const { data, error } = await db
+    .from('parent_releases')
+    .select('id, title, release_type, status, created_at, updated_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  parentReleaseCache = (data || []).map(normalizeParentReleaseRow);
+  return parentReleaseCache.slice();
+}
+
+export async function fetchParentReleaseTracks(parentReleaseId) {
+  const parentId = normalizeText(parentReleaseId);
+  if (!parentId) return [];
+  const db = getSupabaseClient();
+  const { data, error } = await db
+    .from('parent_release_tracks')
+    .select('id, parent_release_id, child_catalogue_type, child_catalogue_id, track_order, created_at')
+    .eq('parent_release_id', parentId)
+    .order('track_order', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(normalizeParentReleaseTrackRow);
+}
+
+export async function createParentRelease(values) {
+  const db = getSupabaseClient();
+  const title = normalizeText(values && values.title);
+  const releaseType = normalizeText(values && values.release_type);
+  const status = normalizeText(values && values.status) || 'New';
+  const rawTracks = Array.isArray(values && values.tracks) ? values.tracks : [];
+  const tracks = rawTracks
+    .map((row, index) => ({
+      child_catalogue_type: normalizeText(row && row.child_catalogue_type).toLowerCase() === 'label' ? 'label' : 'label',
+      child_catalogue_id: normalizeText(row && row.child_catalogue_id),
+      track_order: Number(row && row.track_order) > 0 ? Number(row.track_order) : (index + 1)
+    }))
+    .filter((row) => row.child_catalogue_id);
+  if (!title) throw new Error('Parent release title is required.');
+  if (!releaseType) throw new Error('Release type is required.');
+  if (!tracks.length) throw new Error('Select at least one existing track.');
+  const { data: insertedParent, error: parentError } = await db
+    .from('parent_releases')
+    .insert({ title, release_type: releaseType, status })
+    .select('id, title, release_type, status, created_at, updated_at')
+    .single();
+  if (parentError) throw parentError;
+  const parentId = normalizeText(insertedParent && insertedParent.id);
+  const trackPayload = tracks.map((row, index) => ({
+    parent_release_id: parentId,
+    child_catalogue_type: row.child_catalogue_type,
+    child_catalogue_id: row.child_catalogue_id,
+    track_order: Number(row.track_order) > 0 ? Number(row.track_order) : (index + 1)
+  }));
+  const { error: trackError } = await db.from('parent_release_tracks').insert(trackPayload);
+  if (trackError) throw trackError;
+  const normalizedParent = normalizeParentReleaseRow(insertedParent);
+  parentReleaseCache = [normalizedParent].concat(parentReleaseCache.filter((row) => row.id !== normalizedParent.id));
+  return normalizedParent;
+}
+
+export async function updateParentRelease(parentReleaseId, values) {
+  const parentId = normalizeText(parentReleaseId);
+  if (!parentId) throw new Error('Missing parent release id.');
+  const db = getSupabaseClient();
+  const title = normalizeText(values && values.title);
+  const releaseType = normalizeText(values && values.release_type);
+  const status = normalizeText(values && values.status) || 'New';
+  const rawTracks = Array.isArray(values && values.tracks) ? values.tracks : [];
+  const tracks = rawTracks
+    .map((row, index) => ({
+      child_catalogue_type: normalizeText(row && row.child_catalogue_type).toLowerCase() === 'label' ? 'label' : 'label',
+      child_catalogue_id: normalizeText(row && row.child_catalogue_id),
+      track_order: Number(row && row.track_order) > 0 ? Number(row.track_order) : (index + 1)
+    }))
+    .filter((row) => row.child_catalogue_id);
+  if (!title) throw new Error('Parent release title is required.');
+  if (!releaseType) throw new Error('Release type is required.');
+  if (!tracks.length) throw new Error('Select at least one existing track.');
+
+  const { data: updatedParent, error: updateError } = await db
+    .from('parent_releases')
+    .update({ title, release_type: releaseType, status, updated_at: new Date().toISOString() })
+    .eq('id', parentId)
+    .select('id, title, release_type, status, created_at, updated_at')
+    .single();
+  if (updateError) throw updateError;
+
+  const { error: deleteTracksError } = await db
+    .from('parent_release_tracks')
+    .delete()
+    .eq('parent_release_id', parentId);
+  if (deleteTracksError) throw deleteTracksError;
+
+  const trackPayload = tracks.map((row, index) => ({
+    parent_release_id: parentId,
+    child_catalogue_type: row.child_catalogue_type,
+    child_catalogue_id: row.child_catalogue_id,
+    track_order: Number(row.track_order) > 0 ? Number(row.track_order) : (index + 1)
+  }));
+  const { error: insertTracksError } = await db.from('parent_release_tracks').insert(trackPayload);
+  if (insertTracksError) throw insertTracksError;
+
+  const normalizedParent = normalizeParentReleaseRow(updatedParent);
+  parentReleaseCache = [normalizedParent].concat(parentReleaseCache.filter((row) => row.id !== normalizedParent.id));
+  return normalizedParent;
+}
+
+export async function deleteParentRelease(parentReleaseId) {
+  const parentId = normalizeText(parentReleaseId);
+  if (!parentId) throw new Error('Missing parent release id.');
+  const db = getSupabaseClient();
+  const { error: deleteParentError } = await db
+    .from('parent_releases')
+    .delete()
+    .eq('id', parentId);
+  if (deleteParentError) throw deleteParentError;
+  parentReleaseCache = parentReleaseCache.filter((row) => row.id !== parentId);
+  return parentId;
+}
+
 export async function createLabelCatalogueRow(values) {
   const db = getSupabaseClient();
   const payload = {
@@ -356,7 +499,8 @@ export async function fetchCataloguePipelineLinks() {
 
 export function saveCataloguePipelineLink(link) {
   const next = getCataloguePipelineLinks();
-  const catalogueType = normalizeText(link.catalogue_type).toLowerCase() === 'publishing' ? 'publishing' : 'label';
+  const requestedType = normalizeText(link.catalogue_type).toLowerCase();
+  const catalogueType = requestedType === 'publishing' ? 'publishing' : (requestedType === 'parent' ? 'parent' : 'label');
   const catalogueId = normalizeText(link.catalogue_id);
   const normalized = {
     id: normalizeText(link.id) || `catalogue:${catalogueType}:${catalogueId}`,
@@ -380,14 +524,16 @@ export function hasPipelineLink(catalogueType, catalogueId) {
 }
 
 export function getCatalogueRow(catalogueType, catalogueId) {
-  const normalizedType = normalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
+  const requestedType = normalizeText(catalogueType).toLowerCase();
+  const normalizedType = requestedType === 'publishing' ? 'publishing' : (requestedType === 'parent' ? 'parent' : 'label');
   const normalizedId = normalizeText(catalogueId);
-  const rows = normalizedType === 'publishing' ? publishingCatalogueCache : labelCatalogueCache;
+  const rows = normalizedType === 'publishing' ? publishingCatalogueCache : (normalizedType === 'parent' ? parentReleaseCache : labelCatalogueCache);
   return rows.find((row) => row.id === normalizedId) || null;
 }
 
 export async function createCataloguePipelineEntry(catalogueType, catalogueId, status = 'New', sourceRow = null) {
-  const normalizedType = normalizeText(catalogueType).toLowerCase() === 'publishing' ? 'publishing' : 'label';
+  const requestedType = normalizeText(catalogueType).toLowerCase();
+  const normalizedType = requestedType === 'publishing' ? 'publishing' : (requestedType === 'parent' ? 'parent' : 'label');
   const normalizedId = normalizeText(catalogueId);
   if (!normalizedId) throw new Error('Missing catalogue id.');
   const resolvedSource = sourceRow || getCatalogueRow(normalizedType, normalizedId);
@@ -440,4 +586,17 @@ export async function createCataloguePipelineEntry(catalogueType, catalogueId, s
     catalogue_type: normalizeText(inserted && inserted.catalogue_type),
     status: normalizeText(inserted && inserted.status) || 'New'
   };
+}
+
+export async function deleteCataloguePipelineEntries(ids) {
+  const rowIds = Array.from(ids || []).map((id) => normalizeText(id)).filter(Boolean);
+  if (!rowIds.length) return 0;
+  const db = getSupabaseClient();
+  const query = rowIds.length === 1
+    ? db.from('catalogue_pipeline_links').delete().eq('id', rowIds[0])
+    : db.from('catalogue_pipeline_links').delete().in('id', rowIds);
+  const { error } = await query;
+  if (error) throw error;
+  await fetchCataloguePipelineLinks();
+  return rowIds.length;
 }

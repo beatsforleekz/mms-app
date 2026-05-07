@@ -93,6 +93,7 @@ export default function ReleaseDetailView({ releaseId, catalogueId, catalogueTyp
 
   const { release, assets, contracts, actions, statements } = state;
   const links = assets.filter((asset) => asset.dropbox_url);
+  const childTracks = Array.isArray(release.child_tracks) ? release.child_tracks : [];
 
   async function handleSaveNotes() {
     setNotesSaving(true);
@@ -134,6 +135,23 @@ export default function ReleaseDetailView({ releaseId, catalogueId, catalogueTyp
             <div><span className="detail-label">ISRC</span><strong>{release.isrc || '—'}</strong></div>
           </div>
         </DetailCard>
+
+        {childTracks.length ? (
+          <DetailCard title="Child Tracks" count={childTracks.length}>
+            <DetailList
+              items={childTracks}
+              emptyText="No child tracks linked."
+              renderItem={(track) => (
+                <div className="detail-item" key={track.id || `${track.child_catalogue_id}-${track.track_order}`}>
+                  <div>
+                    <strong>{track.track_order ? `${track.track_order}. ` : ''}{track.track_title || '—'}</strong>
+                    <div className="detail-meta">{track.artist || '—'}{track.version ? ` · ${track.version}` : ''}{track.isrc ? ` · ${track.isrc}` : ''}</div>
+                  </div>
+                </div>
+              )}
+            />
+          </DetailCard>
+        ) : null}
 
         <DetailCard title="Assets" count={assets.length}>
           <DetailList

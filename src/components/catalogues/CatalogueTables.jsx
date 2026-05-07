@@ -3,24 +3,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import ScreenHeader from '@/components/ScreenHeader';
 import {
+  createParentRelease,
   createLabelCatalogueRow,
   createPublishingCatalogueRow,
   createCataloguePipelineEntry,
+  deleteCataloguePipelineEntries,
   deleteLabelCatalogueRows,
+  deleteParentRelease,
   deletePublishingCatalogueRows,
   fetchCataloguePipelineLinks,
   fetchLabelCatalogue,
+  fetchParentReleaseTracks,
+  fetchParentReleases,
   fetchPublishingCatalogue,
   hasPipelineLink,
   importMappedCatalogueRows,
   parseCatalogueFilePreview,
   updateLabelCatalogueRow,
+  updateParentRelease,
   updatePublishingCatalogueRow
 } from '@/lib/services/catalogues';
 
 const PAGE_SIZE = 100;
 
-function CatalogueActions({ importType, onTypeChange, onImport, onAddNew, disabled }) {
+function CatalogueActions({ importType, onTypeChange, onImport, onAddNew, onCreateParentRelease, disabled }) {
   return (
     <>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -30,12 +36,185 @@ function CatalogueActions({ importType, onTypeChange, onImport, onAddNew, disabl
         <button type="button" className={`shell-btn${importType === 'publishing' ? ' shell-btn-primary' : ''}`} onClick={() => onTypeChange('publishing')} disabled={disabled}>
           Publishing Catalogue
         </button>
+        <button type="button" className={`shell-btn${importType === 'parent' ? ' shell-btn-primary' : ''}`} onClick={() => onTypeChange('parent')} disabled={disabled}>
+          Parent Releases
+        </button>
       </div>
-      <button type="button" className="shell-btn" onClick={onAddNew} disabled={disabled}>Add New</button>
-      <button type="button" className="shell-btn shell-btn-primary" onClick={onImport} disabled={disabled}>
-        {disabled ? 'Loading…' : 'Import Catalogue'}
-      </button>
+      {importType !== 'parent' ? (
+        <button type="button" className="shell-btn" onClick={onAddNew} disabled={disabled}>Add New</button>
+      ) : null}
+      {importType === 'label' || importType === 'parent' ? (
+        <button type="button" className="shell-btn" onClick={onCreateParentRelease} disabled={disabled}>Create Parent Release / EP</button>
+      ) : null}
+      {importType !== 'parent' ? (
+        <button type="button" className="shell-btn shell-btn-primary" onClick={onImport} disabled={disabled}>
+          {disabled ? 'Loading…' : 'Import Catalogue'}
+        </button>
+      ) : null}
     </>
+  );
+}
+
+function ParentReleaseForm({
+  availableTracks,
+  trackSearch,
+  mode,
+  parentArtist,
+  editTrackRows,
+  linkedTracks,
+  values,
+  selectedTrackIds,
+  onChange,
+  onParentArtistChange,
+  onEditTrackOrderChange,
+  onEditTrackArtistChange,
+  onTrackSearchChange,
+  onToggleTrack,
+  onSave,
+  onCancel,
+  saving
+}) {
+  const releaseTypes = ['Single', 'EP', 'Album', 'Compilation', 'Remix Package'];
+  const lowered = String(trackSearch || '').trim().toLowerCase();
+  const visibleTracks = (availableTracks || []).filter((row) => {
+    if (!lowered) return true;
+    return [
+      row.artist || '',
+      row.track_title || '',
+      row.version || '',
+      row.isrc || '',
+      row.release_title || ''
+    ].join(' ').toLowerCase().includes(lowered);
+  });
+  return (
+    <div className="module-card">
+      <div className="module-card-head">
+        <h3>{mode === 'edit' ? 'Parent Release Details' : 'Create Parent Release / EP'}</h3>
+      </div>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+          <span style={{ fontWeight: 600 }}>Release Type</span>
+          <select className="shell-btn" value={values.release_type || 'EP'} onChange={(event) => onChange('release_type', event.target.value)}>
+            {releaseTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </label>
+        <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+          <span style={{ fontWeight: 600 }}>Parent Title</span>
+          <input
+            type="text"
+            value={values.title || ''}
+            onChange={(event) => onChange('title', event.target.value)}
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+          />
+        </label>
+        {mode === 'edit' ? (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <label style={{ display: 'grid', gap: 6, fontSize: 12 }}>
+              <span style={{ fontWeight: 600 }}>Artist</span>
+              <input
+                type="text"
+                value={parentArtist || ''}
+                onChange={(event) => onParentArtistChange(event.target.value)}
+                style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+              />
+            </label>
+            <div style={{ fontWeight: 600, fontSize: 12 }}>Linked Tracks</div>
+            {editTrackRows && editTrackRows.length ? (
+              <div className="table-wrap" style={{ maxHeight: 280 }}>
+                <table className="catalogue-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Artist</th>
+                      <th>Title</th>
+                      <th>Version</th>
+                      <th>ISRC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editTrackRows.map((row) => (
+                      <tr key={`${row.child_catalogue_id}-${row.track_order}`}>
+                        <td>
+                          <input
+                            type="number"
+                            min={1}
+                            value={row.track_order || ''}
+                            onChange={(event) => onEditTrackOrderChange(row.child_catalogue_id, event.target.value)}
+                            style={{ width: 72, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)' }}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={row.artist || ''}
+                            onChange={(event) => onEditTrackArtistChange(row.child_catalogue_id, event.target.value)}
+                            style={{ width: '100%', minWidth: 140, padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)' }}
+                          />
+                        </td>
+                        <td>{row.track_title || '—'}</td>
+                        <td>{row.version || '—'}</td>
+                        <td>{row.isrc || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-block">No linked tracks.</div>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontWeight: 600, fontSize: 12 }}>Select Existing Catalogue Tracks</div>
+            <input
+              type="text"
+              value={trackSearch}
+              onChange={(event) => onTrackSearchChange(event.target.value)}
+              placeholder="Type to search tracks..."
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+            />
+            <div className="table-wrap" style={{ maxHeight: 280 }}>
+              <table className="catalogue-table">
+                <thead>
+                  <tr>
+                    <th />
+                    <th>Artist</th>
+                    <th>Title</th>
+                    <th>Version</th>
+                    <th>ISRC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleTracks.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedTrackIds.includes(row.id)}
+                          onChange={(event) => onToggleTrack(row.id, event.target.checked)}
+                          aria-label="Select child track"
+                        />
+                      </td>
+                      <td>{row.artist || '—'}</td>
+                      <td>{row.track_title || '—'}</td>
+                      <td>{row.version || '—'}</td>
+                      <td>{row.isrc || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Selected track order follows your selection order.</div>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+        <button type="button" className="shell-btn shell-btn-primary" onClick={onSave} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Parent Release'}
+        </button>
+        <button type="button" className="shell-btn" onClick={onCancel} disabled={saving}>Cancel</button>
+      </div>
+    </div>
   );
 }
 
@@ -328,6 +507,38 @@ export default function CatalogueTables() {
   const [manualValues, setManualValues] = useState({});
   const [editingRowId, setEditingRowId] = useState('');
   const [page, setPage] = useState(1);
+  const [parentReleases, setParentReleases] = useState([]);
+  const [parentTracksMap, setParentTracksMap] = useState({});
+  const [parentLinkedIds, setParentLinkedIds] = useState(new Set());
+  const [showParentForm, setShowParentForm] = useState(false);
+  const [savingParent, setSavingParent] = useState(false);
+  const [parentValues, setParentValues] = useState({ title: '', release_type: 'EP' });
+  const [selectedParentTrackIds, setSelectedParentTrackIds] = useState([]);
+  const [parentTrackSearch, setParentTrackSearch] = useState('');
+  const [editingParentId, setEditingParentId] = useState('');
+  const [editingParentArtist, setEditingParentArtist] = useState('');
+  const [editingParentTrackRows, setEditingParentTrackRows] = useState([]);
+
+  const PARENT_ARTIST_OVERRIDES_KEY = 'parent_release_artist_overrides_v1';
+
+  function readParentArtistOverrides() {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = JSON.parse(window.localStorage.getItem(PARENT_ARTIST_OVERRIDES_KEY) || '{}');
+      return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function writeParentArtistOverride(parentId, artist) {
+    if (typeof window === 'undefined') return;
+    const key = String(parentId || '').trim();
+    if (!key) return;
+    const map = readParentArtistOverrides();
+    map[key] = String(artist || '').trim();
+    window.localStorage.setItem(PARENT_ARTIST_OVERRIDES_KEY, JSON.stringify(map));
+  }
 
   const filteredRows = useMemo(() => {
     const lowered = search.trim().toLowerCase();
@@ -408,14 +619,37 @@ export default function CatalogueTables() {
   async function loadActiveCatalogue(type = activeType) {
     setFetching(true);
     try {
-      const [nextRows, pipelineLinks] = await Promise.all([
-        type === 'publishing' ? fetchPublishingCatalogue() : fetchLabelCatalogue(),
-        fetchCataloguePipelineLinks()
-      ]);
-      setRows(nextRows);
-      const linkedLookup = new Set((pipelineLinks || []).filter((row) => row.catalogue_type === type).map((row) => row.catalogue_id));
-      setLinkedIds(new Set(nextRows.filter((row) => linkedLookup.has(row.id)).map((row) => row.id)));
-      setSelectedIds(new Set());
+      const pipelineLinks = await fetchCataloguePipelineLinks();
+      if (type === 'parent') {
+        const labelRows = await fetchLabelCatalogue();
+        setRows(labelRows);
+        setLinkedIds(new Set());
+        setSelectedIds(new Set());
+        const parents = await fetchParentReleases();
+        setParentReleases(parents);
+        const parentLinkedLookup = new Set((pipelineLinks || []).filter((row) => row.catalogue_type === 'parent').map((row) => row.catalogue_id));
+        setParentLinkedIds(new Set(parents.filter((row) => parentLinkedLookup.has(row.id)).map((row) => row.id)));
+        const tracksEntries = await Promise.all(parents.map(async (parent) => {
+          const tracks = await fetchParentReleaseTracks(parent.id);
+          return [parent.id, tracks];
+        }));
+        setParentTracksMap(Object.fromEntries(tracksEntries));
+      } else {
+        const nextRows = type === 'publishing' ? await fetchPublishingCatalogue() : await fetchLabelCatalogue();
+        setRows(nextRows);
+        const linkedLookup = new Set((pipelineLinks || []).filter((row) => row.catalogue_type === type).map((row) => row.catalogue_id));
+        setLinkedIds(new Set(nextRows.filter((row) => linkedLookup.has(row.id)).map((row) => row.id)));
+        setSelectedIds(new Set());
+        const parents = await fetchParentReleases();
+        setParentReleases(parents);
+        const parentLinkedLookup = new Set((pipelineLinks || []).filter((row) => row.catalogue_type === 'parent').map((row) => row.catalogue_id));
+        setParentLinkedIds(new Set(parents.filter((row) => parentLinkedLookup.has(row.id)).map((row) => row.id)));
+        const tracksEntries = await Promise.all(parents.map(async (parent) => {
+          const tracks = await fetchParentReleaseTracks(parent.id);
+          return [parent.id, tracks];
+        }));
+        setParentTracksMap(Object.fromEntries(tracksEntries));
+      }
     } finally {
       setFetching(false);
     }
@@ -424,8 +658,10 @@ export default function CatalogueTables() {
   useEffect(() => {
     setSearch('');
     setShowAddForm(false);
+    setShowParentForm(false);
     setManualValues({});
     setEditingRowId('');
+    setEditingParentId('');
     loadActiveCatalogue(activeType).catch((err) => {
       setError(err.message || 'Failed to load catalogue.');
     });
@@ -520,10 +756,30 @@ export default function CatalogueTables() {
     setMessage('');
     setPreview(null);
     setShowAddForm(true);
+    setShowParentForm(false);
     setEditingRowId('');
+    setEditingParentId('');
     setManualValues(activeType === 'publishing'
       ? { work_title: '', writers: '', tempo_id: '', iswc: '' }
       : { artist: '', track_title: '', version: '', release_title: '', isrc: '' });
+  }
+
+  function handleOpenParentForm() {
+    setError('');
+    setMessage('');
+    setPreview(null);
+    setShowAddForm(false);
+    setShowParentForm(true);
+    setEditingRowId('');
+    setParentValues({ title: '', release_type: 'EP' });
+    setSelectedParentTrackIds([]);
+    setParentTrackSearch('');
+    setEditingParentId('');
+    setEditingParentArtist('');
+    setEditingParentTrackRows([]);
+    if (!rows.length) {
+      fetchLabelCatalogue().then((labelRows) => setRows(labelRows)).catch(() => {});
+    }
   }
 
   function handleOpenEditForm(row) {
@@ -531,7 +787,9 @@ export default function CatalogueTables() {
     setMessage('');
     setPreview(null);
     setShowAddForm(true);
+    setShowParentForm(false);
     setEditingRowId(String(row.id || ''));
+    setEditingParentId('');
     setManualValues(activeType === 'publishing'
       ? {
           work_title: row.work_title || '',
@@ -564,6 +822,144 @@ export default function CatalogueTables() {
       setMessage('Added to Pipeline.');
     } catch (err) {
       setError(err.message || 'Failed to add catalogue row to pipeline.');
+    } finally {
+      setBusyKey('');
+    }
+  }
+
+  async function handleSaveParentRelease() {
+    setError('');
+    setMessage('');
+    setSavingParent(true);
+    try {
+      const payload = {
+        title: parentValues.title,
+        release_type: parentValues.release_type,
+        tracks: selectedParentTrackIds.map((id, index) => ({
+          child_catalogue_type: 'label',
+          child_catalogue_id: id,
+          track_order: index + 1
+        }))
+      };
+      if (editingParentId) {
+        const normalizedTracks = (editingParentTrackRows || [])
+          .map((row, index) => ({
+            child_catalogue_type: 'label',
+            child_catalogue_id: row.child_catalogue_id,
+            track_order: Number(row.track_order) > 0 ? Number(row.track_order) : (index + 1)
+          }))
+          .filter((row) => row.child_catalogue_id);
+        await updateParentRelease(editingParentId, {
+          ...payload,
+          tracks: normalizedTracks
+        });
+        writeParentArtistOverride(editingParentId, editingParentArtist);
+      } else {
+        const parent = await createParentRelease(payload);
+        let pipelineWarning = '';
+        try {
+          await createCataloguePipelineEntry('parent', parent.id, 'New', parent);
+        } catch (err) {
+          pipelineWarning = err && err.message ? err.message : 'Pipeline link failed.';
+        }
+        if (pipelineWarning) {
+          setMessage(`Parent release created. Pipeline link failed: ${pipelineWarning}`);
+        } else {
+          setMessage('Parent release created and added to Pipeline.');
+        }
+      }
+      setShowParentForm(false);
+      setShowAddForm(false);
+      setParentValues({ title: '', release_type: 'EP' });
+      setSelectedParentTrackIds([]);
+      setParentTrackSearch('');
+      setEditingParentId('');
+      setEditingParentArtist('');
+      setEditingParentTrackRows([]);
+      await loadActiveCatalogue(activeType);
+      if (editingParentId) setMessage('Parent release updated.');
+    } catch (err) {
+      setError(err.message || 'Failed to create parent release.');
+    } finally {
+      setSavingParent(false);
+    }
+  }
+
+  function handleEditParentRelease(parentRow) {
+    const parentId = String(parentRow && parentRow.id || '');
+    if (!parentId) return;
+    const tracks = parentTracksMap[parentId] || [];
+    setError('');
+    setMessage('');
+    setShowAddForm(false);
+    setShowParentForm(true);
+    setEditingRowId('');
+    setEditingParentId(parentId);
+    const artistOverrides = readParentArtistOverrides();
+    setParentValues({
+      title: parentRow.title || '',
+      release_type: parentRow.release_type || 'EP'
+    });
+    const hydratedTracks = tracks.slice().sort((a, b) => (a.track_order || 0) - (b.track_order || 0)).map((row) => {
+      const source = rows.find((item) => item.id === row.child_catalogue_id) || {};
+      return {
+        ...row,
+        artist: source.artist || '',
+        track_title: source.track_title || '',
+        version: source.version || '',
+        isrc: source.isrc || ''
+      };
+    });
+    setEditingParentTrackRows(hydratedTracks);
+    setEditingParentArtist(String(artistOverrides[parentId] || hydratedTracks[0]?.artist || ''));
+    setSelectedParentTrackIds(hydratedTracks.map((row) => row.child_catalogue_id));
+    setParentTrackSearch('');
+    if (!rows.length) {
+      fetchLabelCatalogue().then((labelRows) => setRows(labelRows)).catch(() => {});
+    }
+  }
+
+  async function handleDeleteParentRelease(parentRow) {
+    const parentId = String(parentRow && parentRow.id || '');
+    if (!parentId) return;
+    if (!confirm(`Delete parent release "${parentRow.title || parentId}"?`)) return;
+    setBusyKey(`parent-delete:${parentId}`);
+    setError('');
+    setMessage('');
+    try {
+      await deleteParentRelease(parentId);
+      if (parentLinkedIds.has(parentId)) {
+        const linkRows = await fetchCataloguePipelineLinks();
+        const linkedRow = (linkRows || []).find((row) => row.catalogue_type === 'parent' && row.catalogue_id === parentId);
+        if (linkedRow && linkedRow.id) {
+          await deleteCataloguePipelineEntries([linkedRow.id]);
+        }
+      }
+      await loadActiveCatalogue(activeType);
+      setMessage('Parent release deleted.');
+    } catch (err) {
+      setError(err.message || 'Failed to delete parent release.');
+    } finally {
+      setBusyKey('');
+    }
+  }
+
+  async function handleAddParentToPipeline(parentRow) {
+    const rowId = String(parentRow && parentRow.id || '');
+    if (!rowId) return;
+    setBusyKey(`parent:${rowId}`);
+    setError('');
+    setMessage('');
+    try {
+      await createCataloguePipelineEntry('parent', rowId, 'New', parentRow);
+      setParentLinkedIds((prev) => {
+        const next = new Set(prev);
+        next.add(rowId);
+        return next;
+      });
+      setMessage('Added to Pipeline.');
+    } catch (err) {
+      setError(err.message || 'Failed to add parent release to pipeline.');
     } finally {
       setBusyKey('');
     }
@@ -608,7 +1004,7 @@ export default function CatalogueTables() {
       <ScreenHeader
         title="Catalogues"
         subtitle="Dedicated catalogue views for label and publishing records."
-        actions={<CatalogueActions importType={activeType} onTypeChange={setActiveType} onImport={() => inputRef.current?.click()} onAddNew={handleOpenAddForm} disabled={fetching || importing || deleting || savingManual} />}
+        actions={<CatalogueActions importType={activeType} onTypeChange={setActiveType} onImport={() => inputRef.current?.click()} onAddNew={handleOpenAddForm} onCreateParentRelease={handleOpenParentForm} disabled={fetching || importing || deleting || savingManual || savingParent} />}
       />
       <input ref={inputRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleImport} hidden />
       {fetching ? <div className="module-card"><div className="loading-block">Loading…</div></div> : null}
@@ -625,6 +1021,125 @@ export default function CatalogueTables() {
           mode={editingRowId ? 'edit' : 'create'}
         />
       ) : null}
+      {showParentForm ? (
+        <ParentReleaseForm
+          availableTracks={rows}
+          trackSearch={parentTrackSearch}
+          mode={editingParentId ? 'edit' : 'create'}
+          parentArtist={editingParentArtist}
+          editTrackRows={editingParentTrackRows}
+          linkedTracks={(editingParentId ? (parentTracksMap[editingParentId] || []) : []).map((track) => {
+            const source = rows.find((item) => item.id === track.child_catalogue_id) || {};
+            return {
+              ...track,
+              artist: source.artist || '',
+              track_title: source.track_title || '',
+              version: source.version || '',
+              isrc: source.isrc || ''
+            };
+          })}
+          values={parentValues}
+          selectedTrackIds={selectedParentTrackIds}
+          onChange={(field, value) => setParentValues((prev) => ({ ...prev, [field]: value }))}
+          onParentArtistChange={setEditingParentArtist}
+          onEditTrackOrderChange={(childCatalogueId, nextOrderValue) => {
+            setEditingParentTrackRows((prev) => prev.map((row) => {
+              if (row.child_catalogue_id !== childCatalogueId) return row;
+              return { ...row, track_order: Number(nextOrderValue) > 0 ? Number(nextOrderValue) : '' };
+            }));
+          }}
+          onEditTrackArtistChange={(childCatalogueId, nextArtist) => {
+            setEditingParentTrackRows((prev) => prev.map((row) => {
+              if (row.child_catalogue_id !== childCatalogueId) return row;
+              return { ...row, artist: nextArtist };
+            }));
+          }}
+          onTrackSearchChange={setParentTrackSearch}
+          onToggleTrack={(trackId, checked) => {
+            setSelectedParentTrackIds((prev) => {
+              const exists = prev.includes(trackId);
+              if (checked && !exists) return prev.concat(trackId);
+              if (!checked && exists) return prev.filter((id) => id !== trackId);
+              return prev;
+            });
+          }}
+            onSave={handleSaveParentRelease}
+          onCancel={() => { setShowParentForm(false); setShowAddForm(false); setParentValues({ title: '', release_type: 'EP' }); setSelectedParentTrackIds([]); setParentTrackSearch(''); setEditingParentId(''); setEditingParentArtist(''); setEditingParentTrackRows([]); }}
+          saving={savingParent}
+        />
+      ) : null}
+      {activeType === 'parent' ? (
+        <div className="module-card">
+          <div className="module-card-head">
+            <h3>Parent Releases</h3>
+            <span className="count-pill">{parentReleases.length}</span>
+          </div>
+          {parentReleases.length ? (
+            <div className="table-wrap">
+              <table className="catalogue-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>Type</th>
+                    <th>Linked Tracks</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {parentReleases.map((row) => {
+                    const linkedTracks = parentTracksMap[row.id] || [];
+                    const linkedArtists = Array.from(new Set(linkedTracks.map((track) => rows.find((item) => item.id === track.child_catalogue_id)?.artist || '').filter(Boolean)));
+                    const parentArtist = linkedArtists.length ? linkedArtists.join(', ') : '—';
+                    const isLinked = parentLinkedIds.has(row.id);
+                    const isBusy = busyKey === `parent:${row.id}`;
+                    return (
+                      <tr key={row.id}>
+                        <td><strong>{row.title || '—'}</strong></td>
+                        <td>{parentArtist}</td>
+                        <td>{row.release_type || '—'}</td>
+                        <td>
+                          {linkedTracks.length ? linkedTracks.map((track) => `${track.track_order}. ${rows.find((item) => item.id === track.child_catalogue_id)?.track_title || track.child_catalogue_id}`).join(' | ') : '—'}
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="shell-btn"
+                              onClick={() => handleAddParentToPipeline(row)}
+                              disabled={isLinked || isBusy}
+                            >
+                              {isBusy ? 'Adding…' : isLinked ? 'Added' : 'Add to Pipeline'}
+                            </button>
+                            <button
+                              type="button"
+                              className="shell-btn"
+                              onClick={() => handleEditParentRelease(row)}
+                              disabled={savingParent || busyKey === `parent-delete:${row.id}`}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="shell-btn"
+                              onClick={() => handleDeleteParentRelease(row)}
+                              disabled={busyKey === `parent-delete:${row.id}`}
+                            >
+                              {busyKey === `parent-delete:${row.id}` ? 'Deleting…' : 'Delete'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-block">No parent releases yet.</div>
+          )}
+        </div>
+      ) : null}
       {preview ? (
         <ImportPreview
           importType={activeType}
@@ -636,32 +1151,34 @@ export default function CatalogueTables() {
           importing={importing}
         />
       ) : null}
-      <CatalogueTable
-        type={activeType}
-        rows={pagedRows}
-        totalRows={filteredRows.length}
-        rangeStart={rangeStart}
-        rangeEnd={rangeEnd}
-        page={page}
-        totalPages={totalPages}
-        linkedIds={linkedIds}
-        busyId={busyKey}
-        selectedIds={selectedIds}
-        onToggleAll={handleToggleAll}
-        onToggleRow={handleToggleRow}
-        onAdd={handleAddToPipeline}
-        onEditRow={handleOpenEditForm}
-        onDeleteRow={(id) => handleDelete([id])}
-        onDeleteSelected={() => handleDelete(Array.from(selectedIds))}
-        deleting={deleting}
-        search={search}
-        onSearchChange={setSearch}
-        sortOrder={sortOrder}
-        onSortChange={setSortOrder}
-        onPrevPage={() => setPage((prev) => Math.max(1, prev - 1))}
-        onNextPage={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-        onExport={handleExport}
-      />
+      {activeType !== 'parent' ? (
+        <CatalogueTable
+          type={activeType}
+          rows={pagedRows}
+          totalRows={filteredRows.length}
+          rangeStart={rangeStart}
+          rangeEnd={rangeEnd}
+          page={page}
+          totalPages={totalPages}
+          linkedIds={linkedIds}
+          busyId={busyKey}
+          selectedIds={selectedIds}
+          onToggleAll={handleToggleAll}
+          onToggleRow={handleToggleRow}
+          onAdd={handleAddToPipeline}
+          onEditRow={handleOpenEditForm}
+          onDeleteRow={(id) => handleDelete([id])}
+          onDeleteSelected={() => handleDelete(Array.from(selectedIds))}
+          deleting={deleting}
+          search={search}
+          onSearchChange={setSearch}
+          sortOrder={sortOrder}
+          onSortChange={setSortOrder}
+          onPrevPage={() => setPage((prev) => Math.max(1, prev - 1))}
+          onNextPage={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+          onExport={handleExport}
+        />
+      ) : null}
     </section>
   );
 }
