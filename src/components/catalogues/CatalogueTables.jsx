@@ -518,6 +518,7 @@ export default function CatalogueTables() {
   const [editingParentId, setEditingParentId] = useState('');
   const [editingParentArtist, setEditingParentArtist] = useState('');
   const [editingParentTrackRows, setEditingParentTrackRows] = useState([]);
+  const [parentArtistOverrides, setParentArtistOverrides] = useState({});
 
   const PARENT_ARTIST_OVERRIDES_KEY = 'parent_release_artist_overrides_v1';
 
@@ -538,6 +539,7 @@ export default function CatalogueTables() {
     const map = readParentArtistOverrides();
     map[key] = String(artist || '').trim();
     window.localStorage.setItem(PARENT_ARTIST_OVERRIDES_KEY, JSON.stringify(map));
+    setParentArtistOverrides(map);
   }
 
   const filteredRows = useMemo(() => {
@@ -666,6 +668,10 @@ export default function CatalogueTables() {
       setError(err.message || 'Failed to load catalogue.');
     });
   }, [activeType]);
+
+  useEffect(() => {
+    setParentArtistOverrides(readParentArtistOverrides());
+  }, []);
 
   async function handleImport(event) {
     const file = event.target.files && event.target.files[0];
@@ -1090,7 +1096,7 @@ export default function CatalogueTables() {
                   {parentReleases.map((row) => {
                     const linkedTracks = parentTracksMap[row.id] || [];
                     const linkedArtists = Array.from(new Set(linkedTracks.map((track) => rows.find((item) => item.id === track.child_catalogue_id)?.artist || '').filter(Boolean)));
-                    const parentArtist = linkedArtists.length ? linkedArtists.join(', ') : '—';
+                    const parentArtist = String(parentArtistOverrides[row.id] || '').trim() || (linkedArtists.length ? linkedArtists.join(', ') : '—');
                     const isLinked = parentLinkedIds.has(row.id);
                     const isBusy = busyKey === `parent:${row.id}`;
                     return (

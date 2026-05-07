@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '@/lib/supabase/client';
 const RELEASE_NOTES_STORAGE_KEY = 'release_detail_notes';
 const RELEASE_META_STORAGE_KEY = 'pipeline_release_meta_v1';
+const PARENT_ARTIST_OVERRIDES_KEY = 'parent_release_artist_overrides_v1';
 
 function normalizeText(value) {
   return String(value == null ? '' : value).trim();
@@ -99,6 +100,10 @@ function getReleaseNotesMap() {
 
 function getReleaseMetaMap() {
   return readStorageObject(RELEASE_META_STORAGE_KEY);
+}
+
+function getParentArtistOverridesMap() {
+  return readStorageObject(PARENT_ARTIST_OVERRIDES_KEY);
 }
 
 function getReleaseMeta(releaseId) {
@@ -223,13 +228,15 @@ export async function fetchReleaseById(releaseId, catalogueId = '', catalogueTyp
     };
   }
   if (entry.catalogue_type === 'parent') {
+    const artistOverrides = getParentArtistOverridesMap();
+    const overrideArtist = normalizeText(artistOverrides[entry.catalogue_id]);
     const child_tracks = await fetchParentChildTracks(entry.catalogue_id);
     return {
       id: entry.id,
       catalogue_id: entry.catalogue_id,
       catalogue_type: entry.catalogue_type,
       title: savedMeta.title || source.title || '—',
-      artist: savedMeta.artist || 'Various Artists',
+      artist: savedMeta.artist || overrideArtist || 'Various Artists',
       type: savedMeta.type || source.release_type || 'EP',
       company_role: savedMeta.company_role || 'Label',
       status: entry.status || source.status || 'New',

@@ -3362,6 +3362,21 @@
     let parentReleaseData = [];
     let parentReleaseTracksMap = {};
     let pipelineReferenceEntriesCache = [];
+    const PARENT_ARTIST_OVERRIDES_KEY = 'parent_release_artist_overrides_v1';
+
+    function readParentArtistOverrides() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(PARENT_ARTIST_OVERRIDES_KEY) || '{}');
+        return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+      } catch(e) {
+        return {};
+      }
+    }
+
+    function parentArtistOverrideForId(parentId) {
+      const map = readParentArtistOverrides();
+      return String(map[String(parentId || '')] || '').trim();
+    }
 
     function lsReadArray(key) {
       try {
@@ -3649,11 +3664,12 @@
         };
       }
       if (entry.catalogue_type === 'parent') {
+        const overrideArtist = parentArtistOverrideForId(entry.catalogue_id);
         return {
           id: entry.id,
           internal_id: meta.internal_id || '',
           title: meta.title || source.title || '—',
-          artist: meta.artist || 'Various Artists',
+          artist: meta.artist || overrideArtist || 'Various Artists',
           type: meta.type || source.release_type || 'EP',
           company_role: meta.company_role || 'Label',
           status: entry.status || source.status || 'New',
@@ -5747,6 +5763,8 @@
     }
 
     function parentReleaseArtistForId(parentId) {
+      const override = parentArtistOverrideForId(parentId);
+      if (override) return override;
       const pid = String(parentId || '');
       if (!pid) return '';
       const tracks = parentReleaseTracksMap[pid] || [];
