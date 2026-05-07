@@ -1040,6 +1040,25 @@
       padding: 20px;
       margin-bottom: var(--gap);
     }
+    .release-edit-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.45);
+      z-index: 1190;
+    }
+    .release-edit-backdrop.hidden { display: none; }
+    .release-edit-panel.release-edit-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(980px, calc(100vw - 48px));
+      max-height: calc(100vh - 56px);
+      overflow: auto;
+      margin: 0;
+      z-index: 1200;
+      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.25);
+    }
 
     .release-edit-panel.hidden { display: none; }
 
@@ -1928,7 +1947,8 @@
         </div>
 
         <!-- v27: Release edit panel — shown above the table when a row is edited -->
-        <div class="release-edit-panel hidden" id="release-edit-panel">
+        <div class="release-edit-backdrop hidden" id="release-edit-backdrop"></div>
+        <div class="release-edit-panel release-edit-modal hidden" id="release-edit-panel">
           <div class="release-edit-title">
             <span id="release-edit-heading">✎ Edit Release</span>
             <button class="btn btn-ghost" id="release-edit-close" style="padding:3px 10px; font-size:12px;">✕ Close</button>
@@ -2188,6 +2208,9 @@
           to view and update workflow steps.
         </div>
         <div id="workflow-list"></div>
+        <div class="assets-save-bottom">
+          <button class="btn btn-primary" id="workflow-save-btn-bottom" type="button">Save Workflow</button>
+        </div>
       </section>
 
       <!-- CONTRACTS -->
@@ -5237,6 +5260,7 @@
     const elWorkflowReleaseSelect = document.getElementById('workflow-release-select');
     const elWorkflowLoadStatus = document.getElementById('workflow-load-status');
     const elWorkflowSaveBtn = document.getElementById('workflow-save-btn');
+    const elWorkflowSaveBtnBottom = document.getElementById('workflow-save-btn-bottom');
     const elWorkflowPlaceholder = document.getElementById('workflow-placeholder');
     const elWorkflowList = document.getElementById('workflow-list');
     let currentWorkflowReleaseId = '';
@@ -5467,6 +5491,7 @@
       });
     }
     if (elWorkflowSaveBtn) elWorkflowSaveBtn.addEventListener('click', workflowSaveCurrent);
+    if (elWorkflowSaveBtnBottom) elWorkflowSaveBtnBottom.addEventListener('click', workflowSaveCurrent);
     // ══════════════════════════════════════════════════════════════════════════
     //  CONTRACTS (v24)
     //  New: artist_share_percent, payees_json (JSON array of payee objects)
@@ -6542,6 +6567,7 @@
     // ══════════════════════════════════════════════════════════════════════════
 
     const elReleaseEditPanel    = document.getElementById('release-edit-panel');
+    const elReleaseEditBackdrop = document.getElementById('release-edit-backdrop');
     const elReleaseEditFeedback = document.getElementById('release-edit-feedback');
     const elReleaseEditHeading  = document.getElementById('release-edit-heading');
     const RELEASE_META_STORAGE_KEY = 'pipeline_release_meta_v1';
@@ -6793,6 +6819,7 @@
       elReleaseEditHeading.textContent = '✎ Edit Release';
       setReleaseFeedback('', '');
       if (elReleaseStartPanel) elReleaseStartPanel.classList.add('hidden');
+      if (elReleaseEditBackdrop) elReleaseEditBackdrop.classList.remove('hidden');
       elReleaseEditPanel.classList.remove('hidden');
       document.querySelectorAll('#releases-tbody tr.editing, #releases-archive-tbody tr.editing').forEach(function(tr) {
         tr.classList.remove('editing');
@@ -6809,6 +6836,7 @@
     }
 
     function closeReleaseEdit() {
+      if (elReleaseEditBackdrop) elReleaseEditBackdrop.classList.add('hidden');
       elReleaseEditPanel.classList.add('hidden');
       setReleaseFeedback('', '');
       document.querySelectorAll('#releases-tbody tr.editing').forEach(function(tr) {
@@ -6818,6 +6846,12 @@
 
     document.getElementById('release-edit-close').addEventListener('click', closeReleaseEdit);
     document.getElementById('release-edit-cancel-btn').addEventListener('click', closeReleaseEdit);
+    if (elReleaseEditBackdrop) elReleaseEditBackdrop.addEventListener('click', closeReleaseEdit);
+    document.addEventListener('keydown', function(e) {
+      if (e.key !== 'Escape') return;
+      if (!elReleaseEditPanel || elReleaseEditPanel.classList.contains('hidden')) return;
+      closeReleaseEdit();
+    });
 
     // Wire the + New Release button
     const elReleasesNewBtn = document.getElementById('releases-new-btn');
