@@ -15,10 +15,9 @@ const STATUS_OPTIONS = [
 ];
 
 const GROUPS = [
-  { key: 'open', label: 'Open' },
-  { key: 'in_progress', label: 'In Progress' },
   { key: 'Chase', label: 'Follow Up' },
-  { key: 'blocked', label: 'Blocked' },
+  { key: 'in_progress', label: 'In Progress' },
+  { key: 'open', label: 'Open' },
   { key: 'done', label: 'Done' }
 ];
 
@@ -95,6 +94,7 @@ export default function ActionsWorkspace() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorSaving, setEditorSaving] = useState(false);
   const [editor, setEditor] = useState(emptyEditor());
+  const [detailAction, setDetailAction] = useState(null);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -195,6 +195,10 @@ export default function ActionsWorkspace() {
       notes: action.notes || ''
     });
     setEditorOpen(true);
+  }
+
+  function openDetail(action) {
+    setDetailAction(action || null);
   }
 
   async function handleQuickAdd() {
@@ -403,6 +407,35 @@ export default function ActionsWorkspace() {
             </div>
           ) : null}
 
+          {detailAction ? (
+            <div className="detail-card">
+              <div className="detail-card-head">
+                <h3>Action Detail</h3>
+              </div>
+              <div className="actions-workspace-pad">
+                <div className="detail-grid">
+                  <div><span className="detail-label">Action</span><strong>{detailAction.title || '—'}</strong></div>
+                  <div><span className="detail-label">Status</span><strong>{statusLabel(detailAction.status)}</strong></div>
+                  <div><span className="detail-label">Task Type</span><strong>{visibilityValue(detailAction.visibility)}</strong></div>
+                  <div><span className="detail-label">Priority</span><strong>{detailAction.priority || '—'}</strong></div>
+                  <div><span className="detail-label">Linked Release</span><strong>{releaseLabelForId(releases, detailAction.release_id) || '—'}</strong></div>
+                  <div><span className="detail-label">Due Date</span><strong>{detailAction.due_date ? formatDate(detailAction.due_date) : '—'}</strong></div>
+                  <div><span className="detail-label">Completed Date</span><strong>{detailAction.completed_date ? formatDate(detailAction.completed_date) : '—'}</strong></div>
+                  <div><span className="detail-label">Today</span><strong>{actionTodayBool(detailAction.to_do_today) ? 'Yes' : 'No'}</strong></div>
+                  <div><span className="detail-label">Related To</span><strong>{detailAction.related_to || '—'}</strong></div>
+                  <div><span className="detail-label">Reference Name</span><strong>{detailAction.reference_name || '—'}</strong></div>
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <span className="detail-label">Notes</span>
+                  <div className="empty-block" style={{ marginTop: 6, textAlign: 'left' }}>{detailAction.notes || '—'}</div>
+                </div>
+                <div className="actions-editor-actions">
+                  <button type="button" className="shell-btn" onClick={() => setDetailAction(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {error ? <div className="empty-block">{error}</div> : null}
           {loading ? <div className="loading-block">Loading actions…</div> : null}
           {!loading && !groupedActions.length ? <div className="empty-block">No actions yet.</div> : null}
@@ -460,6 +493,7 @@ export default function ActionsWorkspace() {
                         <div className="actions-status-cell"><span className={`actions-badge ${statusClass(action.status)}`}>{statusLabel(action.status)}</span></div>
                         <div className="actions-controls-cell">
                           <button type="button" className={`actions-done-btn${isDone ? '' : ' ready'}`} onClick={(event) => handleToggleDone(action, event)}>{isDone ? 'Reopen' : 'Done'}</button>
+                          <button type="button" className="shell-btn" onClick={() => openDetail(action)}>View</button>
                           <button type="button" className="shell-btn" onClick={() => openEditor(action)}>Edit</button>
                           <button type="button" className="shell-btn" onClick={(event) => handleDelete(action, event)}>Delete</button>
                         </div>
