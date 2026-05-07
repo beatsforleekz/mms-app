@@ -12,7 +12,9 @@ function normalizeVisibility(value) {
 function normalizeStatus(value) {
   const raw = normalizeText(value);
   if (!raw) return 'open';
-  return raw === 'Chase' ? 'Chase' : raw.toLowerCase();
+  if (raw === 'Chase') return 'Chase';
+  if (raw === 'With Methe') return 'With Methe';
+  return raw.toLowerCase();
 }
 
 function normalizeActionRow(row) {

@@ -10,12 +10,14 @@ const STATUS_OPTIONS = [
   { value: 'open', label: 'Open' },
   { value: 'in_progress', label: 'In Progress' },
   { value: 'Chase', label: 'Follow Up' },
+  { value: 'With Methe', label: 'With Methe' },
   { value: 'blocked', label: 'Blocked' },
   { value: 'done', label: 'Done' }
 ];
 
 const GROUPS = [
   { key: 'Chase', label: 'Follow Up' },
+  { key: 'With Methe', label: 'With Methe' },
   { key: 'in_progress', label: 'In Progress' },
   { key: 'open', label: 'Open' },
   { key: 'done', label: 'Done' }
@@ -381,27 +383,36 @@ export default function ActionsWorkspace() {
           </div>
 
           {editorOpen ? (
-            <div className="detail-card">
-              <div className="detail-card-head">
-                <h3>{editor.id ? 'Edit Action' : 'New Action'}</h3>
-              </div>
-              <div className="actions-workspace-pad">
-                <div className="actions-edit-grid">
-                  <label className="actions-field actions-field-wide"><span>Action</span><input value={editor.title} onChange={(event) => setEditor((prev) => ({ ...prev, title: event.target.value }))} /></label>
-                  <label className="actions-field"><span>Related To</span><input value={editor.related_to} onChange={(event) => setEditor((prev) => ({ ...prev, related_to: event.target.value }))} /></label>
-                  <label className="actions-field"><span>Reference Name</span><input value={editor.reference_name} onChange={(event) => setEditor((prev) => ({ ...prev, reference_name: event.target.value }))} /></label>
-                  <label className="actions-field"><span>Linked Release</span><select value={editor.release_id} onChange={(event) => setEditor((prev) => ({ ...prev, release_id: event.target.value }))}><option value="">— none —</option>{releases.map((release) => <option key={release.id} value={release.id}>{releaseLabelForId(releases, release.id) || release.title || release.id}</option>)}</select></label>
-                  <label className="actions-field"><span>Priority</span><select value={editor.priority} onChange={(event) => setEditor((prev) => ({ ...prev, priority: event.target.value }))}><option value="">—</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></label>
-                  <label className="actions-field"><span>Status</span><select value={editor.status} onChange={(event) => setEditor((prev) => ({ ...prev, status: event.target.value }))}>{STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-                  <label className="actions-field"><span>Task Type</span><select value={editor.visibility} onChange={(event) => setEditor((prev) => ({ ...prev, visibility: event.target.value }))}><option value="Shared">Shared</option><option value="Personal">Personal</option></select></label>
-                  <label className="actions-field"><span>Due Date</span><input type="date" value={editor.due_date} onChange={(event) => setEditor((prev) => ({ ...prev, due_date: event.target.value }))} /></label>
-                  <label className="actions-field"><span>Completed Date</span><input type="date" value={editor.completed_date} onChange={(event) => setEditor((prev) => ({ ...prev, completed_date: event.target.value }))} /></label>
-                  <label className="actions-checkline"><input type="checkbox" checked={editor.to_do_today} onChange={(event) => setEditor((prev) => ({ ...prev, to_do_today: event.target.checked }))} /><span>Today</span></label>
-                  <label className="actions-field actions-field-wide"><span>Notes</span><textarea rows={3} value={editor.notes} onChange={(event) => setEditor((prev) => ({ ...prev, notes: event.target.value }))} /></label>
+            <div
+              style={{ position: 'fixed', inset: 0, background: 'rgba(17,24,39,0.45)', zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+              onClick={() => { if (!editorSaving) { setEditorOpen(false); setEditor(emptyEditor()); } }}
+            >
+              <div
+                className="detail-card"
+                style={{ width: 'min(980px, calc(100vw - 48px))', maxHeight: 'calc(100vh - 56px)', overflow: 'auto', margin: 0 }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="detail-card-head">
+                  <h3>{editor.id ? 'Edit Action' : 'New Action'}</h3>
                 </div>
-                <div className="actions-editor-actions">
-                  <button type="button" className="shell-btn shell-btn-primary" onClick={handleSaveEditor} disabled={editorSaving}>{editorSaving ? 'Saving…' : 'Save Action'}</button>
-                  <button type="button" className="shell-btn" onClick={() => { setEditorOpen(false); setEditor(emptyEditor()); }} disabled={editorSaving}>Cancel</button>
+                <div className="actions-workspace-pad">
+                  <div className="actions-edit-grid">
+                    <label className="actions-field actions-field-wide"><span>Action</span><input value={editor.title} onChange={(event) => setEditor((prev) => ({ ...prev, title: event.target.value }))} /></label>
+                    <label className="actions-field"><span>Related To</span><input value={editor.related_to} onChange={(event) => setEditor((prev) => ({ ...prev, related_to: event.target.value }))} /></label>
+                    <label className="actions-field"><span>Reference Name</span><input value={editor.reference_name} onChange={(event) => setEditor((prev) => ({ ...prev, reference_name: event.target.value }))} /></label>
+                    <label className="actions-field"><span>Linked Release</span><select value={editor.release_id} onChange={(event) => setEditor((prev) => ({ ...prev, release_id: event.target.value }))}><option value="">— none —</option>{releases.map((release) => <option key={release.id} value={release.id}>{releaseLabelForId(releases, release.id) || release.title || release.id}</option>)}</select></label>
+                    <label className="actions-field"><span>Priority</span><select value={editor.priority} onChange={(event) => setEditor((prev) => ({ ...prev, priority: event.target.value }))}><option value="">—</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select></label>
+                    <label className="actions-field"><span>Status</span><select value={editor.status} onChange={(event) => setEditor((prev) => ({ ...prev, status: event.target.value }))}>{STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+                    <label className="actions-field"><span>Task Type</span><select value={editor.visibility} onChange={(event) => setEditor((prev) => ({ ...prev, visibility: event.target.value }))}><option value="Shared">Shared</option><option value="Personal">Personal</option></select></label>
+                    <label className="actions-field"><span>Due Date</span><input type="date" value={editor.due_date} onChange={(event) => setEditor((prev) => ({ ...prev, due_date: event.target.value }))} /></label>
+                    <label className="actions-field"><span>Completed Date</span><input type="date" value={editor.completed_date} onChange={(event) => setEditor((prev) => ({ ...prev, completed_date: event.target.value }))} /></label>
+                    <label className="actions-checkline"><input type="checkbox" checked={editor.to_do_today} onChange={(event) => setEditor((prev) => ({ ...prev, to_do_today: event.target.checked }))} /><span>Today</span></label>
+                    <label className="actions-field actions-field-wide"><span>Notes</span><textarea rows={3} value={editor.notes} onChange={(event) => setEditor((prev) => ({ ...prev, notes: event.target.value }))} /></label>
+                  </div>
+                  <div className="actions-editor-actions">
+                    <button type="button" className="shell-btn shell-btn-primary" onClick={handleSaveEditor} disabled={editorSaving}>{editorSaving ? 'Saving…' : 'Save Action'}</button>
+                    <button type="button" className="shell-btn" onClick={() => { setEditorOpen(false); setEditor(emptyEditor()); }} disabled={editorSaving}>Cancel</button>
+                  </div>
                 </div>
               </div>
             </div>
