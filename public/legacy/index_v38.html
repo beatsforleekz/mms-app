@@ -1740,6 +1740,14 @@
         overflow-x: clip;
         padding: 14px;
       }
+      #content > .section.active {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+      }
+      #content > .section.active .section-header {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+      }
       .section-header h2 { font-size: 18px; }
       .section-header p { font-size: 12px; }
       .contracts-toolbar,
@@ -3241,11 +3249,16 @@
       if (main) {
         main.style.width = '100%';
         main.style.minWidth = '0';
+        main.style.display = 'block';
+        main.style.overflow = 'visible';
       }
       const content = document.getElementById('content');
       if (content) {
-        content.style.padding = '20px';
+        content.style.padding = window.matchMedia('(max-width: 1024px)').matches ? '10px 12px 14px' : '20px';
         content.style.overflow = 'visible';
+        content.style.flex = 'none';
+        content.style.minHeight = '0';
+        content.style.marginTop = '0';
       }
     }
     showSection((window.location.hash || '').replace(/^#/, '') || INITIAL_SECTION);
