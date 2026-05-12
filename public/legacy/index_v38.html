@@ -78,6 +78,28 @@
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 var(--gap); flex-shrink: 0;
     }
+    .mobile-nav-toggle {
+      display: none;
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 18px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+    }
+    #mobile-nav-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 1090;
+      border: 0;
+    }
 
     #topbar .page-title { font-size: 14px; font-weight: 600; color: var(--text); }
     .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
@@ -1689,9 +1711,101 @@
     .cgen-copy-btn-wrap { display: flex; align-items: center; gap: 8px; }
     .cgen-copy-feedback { font-size: 12px; color: #065f46; opacity: 0; transition: opacity .3s; }
     .cgen-copy-feedback.show { opacity: 1; }
+
+    @media (max-width: 1024px) {
+      :root { --gap: 14px; --sidebar-w: 268px; }
+      body {
+        height: auto;
+        min-height: 100dvh;
+        overflow: auto;
+      }
+      #mobile-nav-backdrop.show { display: block; }
+      #sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 1100;
+        transform: translateX(-105%);
+        transition: transform .2s ease;
+        max-width: calc(100vw - 44px);
+        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25);
+      }
+      body.mobile-nav-open #sidebar { transform: translateX(0); }
+      #main { overflow: visible; }
+      #topbar { padding: 8px 12px; height: auto; min-height: var(--topbar-h); }
+      .mobile-nav-toggle { display: inline-flex; }
+      #content {
+        overflow: visible;
+        overflow-x: clip;
+        padding: 14px;
+      }
+      .section-header h2 { font-size: 18px; }
+      .section-header p { font-size: 12px; }
+      .contracts-toolbar,
+      .release-selector-bar,
+      .release-dropbox-bar,
+      .search-row {
+        flex-wrap: wrap;
+      }
+      .contracts-toolbar > *,
+      .release-selector-bar > *,
+      .release-dropbox-bar > * {
+        width: 100%;
+        max-width: 100%;
+      }
+      .release-selector-bar label,
+      .release-dropbox-bar label {
+        margin-bottom: 2px;
+      }
+      .btn { min-height: 42px; justify-content: center; }
+      .table-scroll-wrap {
+        margin-left: 0;
+        margin-right: 0;
+        width: 100%;
+      }
+      .data-table { min-width: 980px; font-size: 12px; }
+      .data-table th,
+      .data-table td { padding: 8px 10px; }
+      .contracts-table { min-width: 980px; font-size: 12px; }
+      .contracts-table th,
+      .contracts-table td { padding: 8px 10px; }
+      .payees-table { min-width: 760px; }
+      .release-edit-panel.release-edit-modal,
+      .contract-form-panel,
+      .action-edit-panel,
+      .payee-form-panel,
+      .stmt-form-panel {
+        width: 100%;
+        max-width: 100%;
+      }
+      .release-edit-grid,
+      .contract-form-grid,
+      .payee-form-grid,
+      .stmt-form-grid,
+      .cgen-grid,
+      .cgen-add-tpl-grid {
+        grid-template-columns: 1fr;
+      }
+      .stat-row,
+      .review-grid,
+      .priority-cols {
+        grid-template-columns: 1fr;
+      }
+      .qa-panel-body { padding: 18px 14px; }
+      .cgen-preview-wrap,
+      .cgen-output-wrap,
+      .cgen-code-wrap {
+        overflow: auto;
+      }
+      .cgen-output-html {
+        overflow-wrap: anywhere;
+      }
+    }
   </style>
 </head>
 <body>
+  <button id="mobile-nav-backdrop" aria-label="Close navigation"></button>
 
   <!-- ═════ SIDEBAR ═════ -->
   <aside id="sidebar">
@@ -1718,7 +1832,10 @@
   <!-- ═════ MAIN ═════ -->
   <div id="main">
     <div id="topbar">
-      <div class="page-title" id="topbar-title">Dashboard</div>
+      <div style="display:flex;align-items:center;min-width:0;">
+        <button class="mobile-nav-toggle" id="mobile-nav-toggle" aria-label="Open navigation">☰</button>
+        <div class="page-title" id="topbar-title">Dashboard</div>
+      </div>
       <div class="topbar-right"><div class="avatar">L</div></div>
     </div>
 
@@ -3071,12 +3188,23 @@
     const navButtons  = document.querySelectorAll('.nav-btn');
     const sections    = document.querySelectorAll('.section');
     const topbarTitle = document.getElementById('topbar-title');
+    const mobileNavToggle = document.getElementById('mobile-nav-toggle');
+    const mobileNavBackdrop = document.getElementById('mobile-nav-backdrop');
+    function closeMobileNav() {
+      document.body.classList.remove('mobile-nav-open');
+      if (mobileNavBackdrop) mobileNavBackdrop.classList.remove('show');
+    }
+    function openMobileNav() {
+      document.body.classList.add('mobile-nav-open');
+      if (mobileNavBackdrop) mobileNavBackdrop.classList.add('show');
+    }
     function showSection(id) {
       sections.forEach(s => s.classList.remove('active'));
       navButtons.forEach(b => b.classList.remove('active'));
       const t = document.getElementById('section-' + id); if (t) t.classList.add('active');
       const b = document.querySelector('.nav-btn[data-section="' + id + '"]'); if (b) b.classList.add('active');
       topbarTitle.textContent = TITLES[id] || '';
+      if (window.matchMedia('(max-width: 1024px)').matches) closeMobileNav();
       if (id === 'assets' && typeof refreshAssetsReleaseDropdownFromPipeline === 'function') {
         refreshAssetsReleaseDropdownFromPipeline().catch(function(err) {
           console.warn('[Assets Checklist] Failed to refresh release dropdown:', err && err.message ? err.message : err);
@@ -3096,6 +3224,8 @@
       }
     }
     navButtons.forEach(btn => btn.addEventListener('click', () => showSection(btn.dataset.section)));
+    if (mobileNavToggle) mobileNavToggle.addEventListener('click', openMobileNav);
+    if (mobileNavBackdrop) mobileNavBackdrop.addEventListener('click', closeMobileNav);
     if (EMBED_MODE) {
       const sidebar = document.getElementById('sidebar');
       const topbar = document.getElementById('topbar');

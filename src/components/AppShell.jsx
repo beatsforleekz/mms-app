@@ -19,6 +19,7 @@ export default function AppShell({ children }) {
   const meta = useMemo(() => routeMetaForPath(pathname || '/dashboard'), [pathname]);
   const [authReady, setAuthReady] = useState(false);
   const [session, setSession] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const isLoginRoute = pathname === '/login';
 
   useEffect(() => {
@@ -58,6 +59,10 @@ export default function AppShell({ children }) {
     };
   }, [isLoginRoute, router]);
 
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
   if (!authReady) {
     return <div className="auth-shell"><div className="auth-card"><div className="loading-block">Loading…</div></div></div>;
   }
@@ -71,7 +76,13 @@ export default function AppShell({ children }) {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${mobileNavOpen ? ' mobile-nav-open' : ''}`}>
+      <button
+        type="button"
+        className={`shell-mobile-backdrop${mobileNavOpen ? ' open' : ''}`}
+        aria-label="Close navigation"
+        onClick={() => setMobileNavOpen(false)}
+      />
       <aside className="shell-sidebar">
         <div className="shell-logo">
           <div className="shell-logo-icon">L</div>
@@ -95,6 +106,14 @@ export default function AppShell({ children }) {
       </aside>
       <main className="shell-main">
         <header className="shell-topbar">
+          <button
+            type="button"
+            className="shell-mobile-toggle"
+            aria-label="Open navigation"
+            onClick={() => setMobileNavOpen(true)}
+          >
+            ☰
+          </button>
           <div>
             <div className="shell-title">{meta.title}</div>
             <div className="shell-subtitle">{meta.subtitle}</div>
