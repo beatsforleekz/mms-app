@@ -4266,7 +4266,12 @@
         ? String(releaseLike.catalogue_id || '')
         : '';
       const catalogueType = typeof releaseLike === 'object' && releaseLike
-        ? (String(releaseLike.catalogue_type || '').toLowerCase() === 'publishing' ? 'publishing' : 'label')
+        ? (function() {
+            const rawType = String(releaseLike.catalogue_type || '').toLowerCase();
+            if (rawType === 'publishing') return 'publishing';
+            if (rawType === 'parent') return 'parent';
+            return 'label';
+          })()
         : '';
 
       return (allContracts || []).some(function(c) {
