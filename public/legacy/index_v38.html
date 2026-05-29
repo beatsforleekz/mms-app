@@ -5385,10 +5385,12 @@
       'Rob Picks Track',
       'Office Sends Contract',
       'Contract Returned',
+      'Countersigned Returned',
       'File Contract',
       'Add to MMS App and Statement System',
       'Send Onboarding Link',
       'Check Google Form / Onboarding Complete',
+      'Add Assets to Dropbox and Rename',
       'Create Label Copy',
       'Create Artwork',
       'Mark Assets Received in Checklist',
@@ -5467,17 +5469,26 @@
       if (error) throw error;
       if (!data || !data.length) return workflowDefaultRows();
       const byOrder = {};
+      const byKey = {};
+      const byTitle = {};
       (data || []).forEach(function(row) {
-        byOrder[Number(row.step_order)] = row || {};
+        const current = row || {};
+        const currentOrder = Number(current.step_order);
+        if (Number.isFinite(currentOrder) && !byOrder[currentOrder]) byOrder[currentOrder] = current;
+        const key = workflowStepKey(current.step_key || current.step_title || '');
+        if (key && !byKey[key]) byKey[key] = current;
+        const title = String(current.step_title || '').trim();
+        if (title && !byTitle[title]) byTitle[title] = current;
       });
       return WORKFLOW_STEPS.map(function(step, idx) {
         const stepOrder = idx + 1;
-        const saved = byOrder[stepOrder] || {};
+        const stepKey = workflowStepKey(step);
+        const saved = byKey[stepKey] || byTitle[step] || byOrder[stepOrder] || {};
         const status = WORKFLOW_STATUS.indexOf(String(saved.status || '')) >= 0 ? String(saved.status) : 'Not Started';
         return {
           id: stepOrder,
           step_order: stepOrder,
-          step_key: String(saved.step_key || workflowStepKey(step)),
+          step_key: stepKey,
           step_title: step,
           status: status,
           notes: String(saved.notes || ''),
