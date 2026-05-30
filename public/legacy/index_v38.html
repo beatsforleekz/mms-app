@@ -3247,17 +3247,24 @@
     navButtons.forEach(btn => btn.addEventListener('click', () => showSection(btn.dataset.section)));
     if (mobileNavToggle) mobileNavToggle.addEventListener('click', openMobileNav);
     if (mobileNavBackdrop) mobileNavBackdrop.addEventListener('click', closeMobileNav);
+    closeMobileNav();
     if (EMBED_MODE) {
       const sidebar = document.getElementById('sidebar');
       const topbar = document.getElementById('topbar');
+      const mobileToggle = document.getElementById('mobile-nav-toggle');
+      const mobileBackdrop = document.getElementById('mobile-nav-backdrop');
       const body = document.body;
       const main = document.getElementById('main');
       if (sidebar) sidebar.style.display = 'none';
       if (topbar) topbar.style.display = 'none';
+      if (mobileToggle) mobileToggle.style.display = 'none';
+      if (mobileBackdrop) mobileBackdrop.style.display = 'none';
       if (body) {
+        body.classList.remove('mobile-nav-open');
         body.style.overflow = 'auto';
         body.style.display = 'block';
         body.style.height = 'auto';
+        body.style.minHeight = '0';
       }
       if (main) {
         main.style.width = '100%';
