@@ -1715,6 +1715,7 @@
     @media (max-width: 1024px) {
       :root { --gap: 14px; --sidebar-w: 268px; }
       body {
+        display: block;
         height: auto;
         min-height: 100dvh;
         overflow: auto;
@@ -1732,15 +1733,27 @@
         box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25);
       }
       body.mobile-nav-open #sidebar { transform: translateX(0); }
-      #main { overflow: visible; }
+      #main {
+        display: block;
+        overflow: visible;
+        min-height: 0;
+        height: auto;
+      }
       #topbar { padding: 8px 12px; height: auto; min-height: var(--topbar-h); }
       .mobile-nav-toggle { display: inline-flex; }
       #content {
+        display: block;
+        min-height: 0;
+        height: auto;
         overflow: visible;
         overflow-x: clip;
         padding: 14px;
+        margin: 0;
       }
       #content > .section.active {
+        display: block;
+        min-height: 0 !important;
+        height: auto !important;
         margin-top: 0 !important;
         padding-top: 0 !important;
       }
@@ -3251,6 +3264,10 @@
         main.style.minWidth = '0';
         main.style.display = 'block';
         main.style.overflow = 'visible';
+        main.style.minHeight = '0';
+        main.style.height = 'auto';
+        main.style.margin = '0';
+        main.style.padding = '0';
       }
       const content = document.getElementById('content');
       if (content) {
@@ -3258,7 +3275,17 @@
         content.style.overflow = 'visible';
         content.style.flex = 'none';
         content.style.minHeight = '0';
+        content.style.height = 'auto';
         content.style.marginTop = '0';
+        content.style.margin = '0';
+        content.style.display = 'block';
+      }
+      const activeSection = document.querySelector('#content > .section.active');
+      if (activeSection) {
+        activeSection.style.marginTop = '0';
+        activeSection.style.paddingTop = '0';
+        activeSection.style.minHeight = '0';
+        activeSection.style.height = 'auto';
       }
     }
     showSection((window.location.hash || '').replace(/^#/, '') || INITIAL_SECTION);
