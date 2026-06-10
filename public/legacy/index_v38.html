@@ -3300,8 +3300,8 @@
     // ══════════════════════════════════════════════════════════════════════════
     //  SUPABASE CONFIG — do not change
     // ══════════════════════════════════════════════════════════════════════════
-    const SUPABASE_URL      = 'https://mzzwkqquvrupxagfsnqm.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_50qTJH-gY--FKXu4babiog_WI1iMJ5k';
+    const SUPABASE_URL      = APP_PARAMS.get('supabase_url') || 'https://mzzwkqquvrupxagfsnqm.supabase.co';
+    const SUPABASE_ANON_KEY = APP_PARAMS.get('supabase_anon_key') || 'sb_publishable_50qTJH-gY--FKXu4babiog_WI1iMJ5k';
     let db = null;
     let currentLegacyUserId = '';
     if (SUPABASE_URL && SUPABASE_ANON_KEY) {

@@ -1,5 +1,5 @@
-export const SUPABASE_URL = 'https://mzzwkqquvrupxagfsnqm.supabase.co';
-export const SUPABASE_ANON_KEY = 'sb_publishable_50qTJH-gY--FKXu4babiog_WI1iMJ5k';
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://mzzwkqquvrupxagfsnqm.supabase.co';
+export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_50qTJH-gY--FKXu4babiog_WI1iMJ5k';
 
 export const LEGACY_SECTION_PATH = '/legacy/index_v38.html';
 
