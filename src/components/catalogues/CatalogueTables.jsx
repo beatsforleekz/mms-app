@@ -61,7 +61,6 @@ function ParentReleaseForm({
   mode,
   parentArtist,
   editTrackRows,
-  linkedTracks,
   values,
   selectedTrackIds,
   onChange,
@@ -70,6 +69,8 @@ function ParentReleaseForm({
   onEditTrackArtistChange,
   onTrackSearchChange,
   onToggleTrack,
+  onAddEditTrack,
+  onRemoveEditTrack,
   onSave,
   onCancel,
   saving
@@ -86,6 +87,8 @@ function ParentReleaseForm({
       row.release_title || ''
     ].join(' ').toLowerCase().includes(lowered);
   });
+  const linkedTrackIdSet = new Set((editTrackRows || []).map((row) => String(row.child_catalogue_id || '')));
+  const editableAvailableTracks = visibleTracks.filter((row) => !linkedTrackIdSet.has(String(row.id || '')));
   return (
     <div className="module-card">
       <div className="module-card-head">
@@ -129,6 +132,7 @@ function ParentReleaseForm({
                       <th>Title</th>
                       <th>Version</th>
                       <th>ISRC</th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -154,6 +158,11 @@ function ParentReleaseForm({
                         <td>{row.track_title || '—'}</td>
                         <td>{row.version || '—'}</td>
                         <td>{row.isrc || '—'}</td>
+                        <td>
+                          <button type="button" className="shell-btn" onClick={() => onRemoveEditTrack(row.child_catalogue_id)}>
+                            Remove
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -162,6 +171,46 @@ function ParentReleaseForm({
             ) : (
               <div className="empty-block">No linked tracks.</div>
             )}
+            <div style={{ fontWeight: 600, fontSize: 12, marginTop: 8 }}>Add More Catalogue Tracks</div>
+            <input
+              type="text"
+              value={trackSearch}
+              onChange={(event) => onTrackSearchChange(event.target.value)}
+              placeholder="Type to search tracks to add..."
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--surface)' }}
+            />
+            <div className="table-wrap" style={{ maxHeight: 240 }}>
+              <table className="catalogue-table">
+                <thead>
+                  <tr>
+                    <th>Artist</th>
+                    <th>Title</th>
+                    <th>Version</th>
+                    <th>ISRC</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {editableAvailableTracks.length ? editableAvailableTracks.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.artist || '—'}</td>
+                      <td>{row.track_title || '—'}</td>
+                      <td>{row.version || '—'}</td>
+                      <td>{row.isrc || '—'}</td>
+                      <td>
+                        <button type="button" className="shell-btn" onClick={() => onAddEditTrack(row)}>
+                          Add
+                        </button>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={5} style={{ color: 'var(--muted)' }}>No more matching catalogue tracks to add.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>
@@ -849,6 +898,12 @@ export default function CatalogueTables() {
       };
       if (editingParentId) {
         const normalizedTracks = (editingParentTrackRows || [])
+          .slice()
+          .sort((a, b) => {
+            const aOrder = Number(a.track_order) > 0 ? Number(a.track_order) : Number.MAX_SAFE_INTEGER;
+            const bOrder = Number(b.track_order) > 0 ? Number(b.track_order) : Number.MAX_SAFE_INTEGER;
+            return aOrder - bOrder;
+          })
           .map((row, index) => ({
             child_catalogue_type: 'label',
             child_catalogue_id: row.child_catalogue_id,
@@ -1034,16 +1089,6 @@ export default function CatalogueTables() {
           mode={editingParentId ? 'edit' : 'create'}
           parentArtist={editingParentArtist}
           editTrackRows={editingParentTrackRows}
-          linkedTracks={(editingParentId ? (parentTracksMap[editingParentId] || []) : []).map((track) => {
-            const source = rows.find((item) => item.id === track.child_catalogue_id) || {};
-            return {
-              ...track,
-              artist: source.artist || '',
-              track_title: source.track_title || '',
-              version: source.version || '',
-              isrc: source.isrc || ''
-            };
-          })}
           values={parentValues}
           selectedTrackIds={selectedParentTrackIds}
           onChange={(field, value) => setParentValues((prev) => ({ ...prev, [field]: value }))}
@@ -1061,6 +1106,23 @@ export default function CatalogueTables() {
             }));
           }}
           onTrackSearchChange={setParentTrackSearch}
+          onAddEditTrack={(trackRow) => {
+            setEditingParentTrackRows((prev) => {
+              if (prev.some((row) => row.child_catalogue_id === trackRow.id)) return prev;
+              return prev.concat({
+                child_catalogue_id: trackRow.id,
+                child_catalogue_type: 'label',
+                track_order: prev.length + 1,
+                artist: trackRow.artist || '',
+                track_title: trackRow.track_title || '',
+                version: trackRow.version || '',
+                isrc: trackRow.isrc || ''
+              });
+            });
+          }}
+          onRemoveEditTrack={(childCatalogueId) => {
+            setEditingParentTrackRows((prev) => prev.filter((row) => row.child_catalogue_id !== childCatalogueId));
+          }}
           onToggleTrack={(trackId, checked) => {
             setSelectedParentTrackIds((prev) => {
               const exists = prev.includes(trackId);
