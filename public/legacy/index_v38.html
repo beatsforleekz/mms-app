@@ -418,6 +418,23 @@
     .dropbox-link { color: var(--accent); text-decoration: none; font-size: 12px; word-break: break-all; }
     .dropbox-link:hover { text-decoration: underline; }
 
+    .release-child-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .release-child-toggle input {
+      margin: 0;
+    }
+
 
     .dashboard-panels {
       display: grid;
@@ -2128,6 +2145,10 @@
           <select id="releases-status-filter" class="cgen-select" style="min-width:150px;">
             <option value="all">All Statuses</option>
           </select>
+          <label class="release-child-toggle" title="Show child track releases that belong to a parent EP / compilation already in the pipeline">
+            <input id="releases-show-child-tracks" type="checkbox" />
+            <span>Show Child Track Releases</span>
+          </label>
         </div>
 
         <div class="debug-panel" id="debug-panel">
@@ -3647,6 +3668,7 @@
     let releasesRoleFilter = 'all';
     let releasesTypeFilter = 'all';
     let releasesStatusFilter = 'all';
+    let releasesShowChildTracks = false;
     const selectedReleaseIds = new Set();
     const selectedContractIds = new Set();
     const selectedActionIds = new Set();
@@ -3657,6 +3679,7 @@
     const LABEL_CATALOGUE_STORAGE_KEY = 'label_catalogue';
     const PUBLISHING_CATALOGUE_STORAGE_KEY = 'publishing_catalogue';
     const PIPELINE_REFERENCE_STORAGE_KEY = 'catalogue_pipeline_links';
+    const RELEASES_SHOW_CHILD_TRACKS_KEY = 'release_pipeline_show_child_tracks_v1';
     let labelCatalogueData = [];
     let publishingCatalogueData = [];
     let parentReleaseData = [];
@@ -3676,6 +3699,20 @@
     function parentArtistOverrideForId(parentId) {
       const map = readParentArtistOverrides();
       return String(map[String(parentId || '')] || '').trim();
+    }
+
+    function readReleaseShowChildTracksPreference() {
+      try {
+        return localStorage.getItem(RELEASES_SHOW_CHILD_TRACKS_KEY) === '1';
+      } catch(e) {
+        return false;
+      }
+    }
+
+    function writeReleaseShowChildTracksPreference(value) {
+      try {
+        localStorage.setItem(RELEASES_SHOW_CHILD_TRACKS_KEY, value ? '1' : '0');
+      } catch(e) {}
     }
 
     function lsReadArray(key) {
@@ -4045,6 +4082,21 @@
       };
     }
 
+    function activeParentChildCatalogueIds(rows) {
+      const set = new Set();
+      (rows || []).forEach(function(row) {
+        if (!row || row.catalogue_type !== 'parent') return;
+        const parentId = String(row.catalogue_id || '');
+        const linkedTracks = parentReleaseTracksMap[parentId] || [];
+        linkedTracks.forEach(function(track) {
+          const childId = catalogueNormalizeText(track && track.child_catalogue_id);
+          const childType = catalogueNormalizeText(track && track.child_catalogue_type) || 'label';
+          if (childId && childType === 'label') set.add(childId);
+        });
+      });
+      return set;
+    }
+
     function getCombinedPipelineRows(dbRows) {
       const refs = getPipelineReferenceEntries().map(buildPipelineReferenceRow);
       return (dbRows || []).concat(refs);
@@ -4199,6 +4251,7 @@
     const elReleasesRoleFilter = document.getElementById('releases-role-filter');
     const elReleasesTypeFilter = document.getElementById('releases-type-filter');
     const elReleasesStatusFilter = document.getElementById('releases-status-filter');
+    const elReleasesShowChildTracks = document.getElementById('releases-show-child-tracks');
 
     const dbg = {
       set(id,t,c){ const el=document.getElementById(id); if(!el)return; el.textContent=t; el.className='debug-value'+(c?' '+c:''); },
@@ -4552,12 +4605,14 @@
           row.raw_status = entry.status || 'New';
           return row;
         });
+        const parentChildIdsInPipeline = activeParentChildCatalogueIds(pipelineRows);
         populateReleaseLogicalFilters(pipelineRows);
         const releaseSearchTerm = String((elReleasesSearch && elReleasesSearch.value) || '').toLowerCase();
         const visibleRows = pipelineRows.filter(function(row) {
           if (releasesRoleFilter !== 'all' && String(row.company_role || '').trim() !== releasesRoleFilter) return false;
           if (releasesTypeFilter !== 'all' && String(row.type || '').trim() !== releasesTypeFilter) return false;
           if (releasesStatusFilter !== 'all' && String(row.status || '').trim() !== releasesStatusFilter) return false;
+          if (!releasesShowChildTracks && row.catalogue_type === 'label' && parentChildIdsInPipeline.has(String(row.catalogue_id || ''))) return false;
           if (releaseSearchTerm) {
             const hay = [
               row.internal_id || '',
@@ -7087,6 +7142,11 @@
       if (typeof renderDashboard === 'function') renderDashboard();
     }
 
+    releasesShowChildTracks = readReleaseShowChildTracksPreference();
+    if (elReleasesShowChildTracks) {
+      elReleasesShowChildTracks.checked = releasesShowChildTracks;
+    }
+
     // ── openReleaseEdit — EDIT mode ─────────────────────────────────────────────
     function openReleaseEdit(r) {
       if (!r) return;
@@ -7174,6 +7234,13 @@
     if (elReleasesStatusFilter) {
       elReleasesStatusFilter.addEventListener('change', function() {
         releasesStatusFilter = elReleasesStatusFilter.value || 'all';
+        fetchReleases();
+      });
+    }
+    if (elReleasesShowChildTracks) {
+      elReleasesShowChildTracks.addEventListener('change', function() {
+        releasesShowChildTracks = !!elReleasesShowChildTracks.checked;
+        writeReleaseShowChildTracksPreference(releasesShowChildTracks);
         fetchReleases();
       });
     }
