@@ -26,6 +26,10 @@
       --muted:     #6b7280;
       --radius:    8px;
       --gap:       24px;
+      --release-select-col-w: 52px;
+      --release-id-col-w: 96px;
+      --release-title-col-w: 360px;
+      --release-artist-col-w: 220px;
     }
 
     body {
@@ -292,14 +296,6 @@
     .data-table tbody tr:last-child td { border-bottom: none; }
     .data-table tbody tr:hover td { background: var(--bg); }
 
-    /* Sticky first three columns so they stay visible while scrolling right */
-    .data-table th.col-id,
-    .data-table td.col-id   { position: sticky; left: 36px;   background: inherit; z-index: 2; border-right: 1px solid var(--border); }
-    .data-table th.col-title,
-    .data-table td.col-title { position: sticky; left: 96px; background: inherit; z-index: 2; border-right: 1px solid var(--border); min-width: 170px; }
-    .data-table th.col-artist,
-    .data-table td.col-artist { position: sticky; left: 266px; background: inherit; z-index: 2; border-right: 2px solid var(--border); min-width: 120px; }
-
     .data-table thead th { z-index: 3; }   /* headers above data cells when sticky */
 
     .col-id     { width: 60px; }
@@ -314,6 +310,114 @@
     .col-notes  { min-width: 140px; max-width: 200px; }
     .data-table td.col-bool { text-align: center; vertical-align: middle; }
     .data-table td.col-notes { font-size: 12px; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Release Pipeline sticky columns use explicit widths so the left offsets
+       stay aligned after filtering/sorting/scrolling in Safari. */
+    #releases-table,
+    #releases-archive-table {
+      table-layout: fixed;
+    }
+
+    #releases-table th,
+    #releases-table td,
+    #releases-archive-table th,
+    #releases-archive-table td {
+      box-sizing: border-box;
+    }
+
+    #releases-table th:first-child,
+    #releases-table td:first-child,
+    #releases-archive-table th:first-child,
+    #releases-archive-table td:first-child {
+      left: 0;
+      width: var(--release-select-col-w);
+      min-width: var(--release-select-col-w);
+      max-width: var(--release-select-col-w);
+    }
+
+    #releases-table th.col-id,
+    #releases-table td.col-id,
+    #releases-archive-table th.col-id,
+    #releases-archive-table td.col-id {
+      position: sticky;
+      left: var(--release-select-col-w);
+      width: var(--release-id-col-w);
+      min-width: var(--release-id-col-w);
+      max-width: var(--release-id-col-w);
+      border-right: 1px solid var(--border);
+    }
+
+    #releases-table th.col-title,
+    #releases-table td.col-title,
+    #releases-archive-table th.col-title,
+    #releases-archive-table td.col-title {
+      position: sticky;
+      left: calc(var(--release-select-col-w) + var(--release-id-col-w));
+      width: var(--release-title-col-w);
+      min-width: var(--release-title-col-w);
+      max-width: var(--release-title-col-w);
+      border-right: 1px solid var(--border);
+    }
+
+    #releases-table th.col-artist,
+    #releases-table td.col-artist,
+    #releases-archive-table th.col-artist,
+    #releases-archive-table td.col-artist {
+      position: sticky;
+      left: calc(var(--release-select-col-w) + var(--release-id-col-w) + var(--release-title-col-w));
+      width: var(--release-artist-col-w);
+      min-width: var(--release-artist-col-w);
+      max-width: var(--release-artist-col-w);
+      border-right: 2px solid var(--border);
+    }
+
+    #releases-table thead th:first-child,
+    #releases-table thead th.col-id,
+    #releases-table thead th.col-title,
+    #releases-table thead th.col-artist,
+    #releases-archive-table thead th:first-child,
+    #releases-archive-table thead th.col-id,
+    #releases-archive-table thead th.col-title,
+    #releases-archive-table thead th.col-artist {
+      background: var(--bg);
+    }
+
+    #releases-table tbody td:first-child,
+    #releases-table tbody td.col-id,
+    #releases-table tbody td.col-title,
+    #releases-table tbody td.col-artist,
+    #releases-archive-table tbody td:first-child,
+    #releases-archive-table tbody td.col-id,
+    #releases-archive-table tbody td.col-title,
+    #releases-archive-table tbody td.col-artist {
+      background: var(--surface);
+    }
+
+    #releases-table tbody tr:hover td:first-child,
+    #releases-table tbody tr:hover td.col-id,
+    #releases-table tbody tr:hover td.col-title,
+    #releases-table tbody tr:hover td.col-artist,
+    #releases-archive-table tbody tr:hover td:first-child,
+    #releases-archive-table tbody tr:hover td.col-id,
+    #releases-archive-table tbody tr:hover td.col-title,
+    #releases-archive-table tbody tr:hover td.col-artist {
+      background: var(--bg);
+    }
+
+    #releases-table th:first-child,
+    #releases-archive-table th:first-child { z-index: 8; }
+    #releases-table th.col-id,
+    #releases-table td.col-id,
+    #releases-archive-table th.col-id,
+    #releases-archive-table td.col-id { z-index: 7; }
+    #releases-table th.col-title,
+    #releases-table td.col-title,
+    #releases-archive-table th.col-title,
+    #releases-archive-table td.col-title { z-index: 6; }
+    #releases-table th.col-artist,
+    #releases-table td.col-artist,
+    #releases-archive-table th.col-artist,
+    #releases-archive-table td.col-artist { z-index: 5; }
 
     .dropbox-link { color: var(--accent); text-decoration: none; font-size: 12px; word-break: break-all; }
     .dropbox-link:hover { text-decoration: underline; }
