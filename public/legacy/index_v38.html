@@ -11,31 +11,39 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Work+Sans:wght@400;500;600;700&display=swap');
+
     /* ── Reset & base ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
       --sidebar-w: 220px;
       --topbar-h: 52px;
-      --accent:    #3b5bdb;
-      --accent-lt: #eef1ff;
-      --bg:        #f4f5f7;
-      --surface:   #ffffff;
-      --border:    #e2e4e9;
-      --text:      #111318;
-      --muted:     #6b7280;
-      --radius:    8px;
+      --accent:    #c96e4d;
+      --accent-lt: #f5dfd5;
+      --accent-ink:#183547;
+      --bg:        #f6f1e8;
+      --surface:   rgba(255, 251, 245, 0.94);
+      --border:    #dbcdbc;
+      --text:      #18242d;
+      --muted:     #6f716f;
+      --radius:    16px;
       --gap:       24px;
       --release-select-col-w: 52px;
       --release-id-col-w: 96px;
       --release-title-col-w: 300px;
       --release-artist-col-w: 180px;
+      --shadow-soft: 0 20px 50px rgba(24, 36, 45, 0.08);
+      --shadow-card: 0 10px 30px rgba(24, 36, 45, 0.06);
     }
 
     body {
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: "Work Sans", "Avenir Next", "Segoe UI", sans-serif;
       font-size: 14px;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at top right, rgba(201, 110, 77, 0.14), transparent 28%),
+        radial-gradient(circle at left center, rgba(24, 53, 71, 0.08), transparent 24%),
+        linear-gradient(180deg, #faf5ee 0%, #f6f1e8 100%);
       color: var(--text);
       height: 100vh;
       overflow: hidden;
@@ -46,41 +54,45 @@
     #sidebar {
       width: var(--sidebar-w);
       min-height: 100vh;
-      background: var(--surface);
-      border-right: 1px solid var(--border);
+      background:
+        radial-gradient(circle at top left, rgba(201, 110, 77, 0.18), transparent 22%),
+        linear-gradient(180deg, #132431 0%, #0f1c27 100%);
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
       display: flex; flex-direction: column; flex-shrink: 0;
+      color: #f3eee7;
     }
 
     #sidebar .logo {
       height: var(--topbar-h);
       display: flex; align-items: center; gap: 10px;
-      padding: 0 18px; border-bottom: 1px solid var(--border);
+      padding: 0 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     }
 
     #sidebar .logo-icon {
-      width: 28px; height: 28px; background: var(--accent); border-radius: 6px;
+      width: 34px; height: 34px; background: rgba(201, 110, 77, 0.14); border-radius: 999px;
       display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: 13px; font-weight: 700; flex-shrink: 0;
+      color: #f6b093; font-size: 13px; font-weight: 700; flex-shrink: 0;
+      border: 1px solid rgba(201, 110, 77, 0.5);
     }
 
-    #sidebar .logo-text { font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.3; }
-    #sidebar .logo-text span { display: block; font-size: 10px; font-weight: 400; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-    #sidebar nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
-    #sidebar nav .nav-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 0 8px; margin-bottom: 6px; }
-    #sidebar nav button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: none; background: none; border-radius: var(--radius); cursor: pointer; font-size: 13.5px; color: var(--muted); text-align: left; transition: background .12s, color .12s; margin-bottom: 2px; }
+    #sidebar .logo-text { font-family: "Oswald", "Arial Narrow", sans-serif; font-size: 18px; font-weight: 500; color: #f3eee7; line-height: 1.2; letter-spacing: .06em; text-transform: uppercase; }
+    #sidebar .logo-text span { display: block; font-size: 10px; font-weight: 600; color: rgba(243, 238, 231, 0.66); text-transform: uppercase; letter-spacing: .16em; margin-top: 4px; font-family: "Work Sans", sans-serif; }
+    #sidebar nav { flex: 1; padding: 18px 12px; overflow-y: auto; }
+    #sidebar nav .nav-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .16em; color: rgba(243, 238, 231, 0.5); padding: 0 12px; margin-bottom: 10px; }
+    #sidebar nav button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 14px; border: none; background: none; border-radius: 14px; cursor: pointer; font-size: 14px; font-weight: 500; color: rgba(243, 238, 231, 0.82); text-align: left; transition: background .12s, color .12s, transform .12s; margin-bottom: 6px; }
     #sidebar nav button .icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
-    #sidebar nav button:hover { background: var(--bg); color: var(--text); }
-    #sidebar nav button.active { background: var(--accent-lt); color: var(--accent); font-weight: 600; }
-    #sidebar .sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+    #sidebar nav button:hover { background: rgba(255, 255, 255, 0.06); color: #fff4ed; transform: translateX(2px); }
+    #sidebar nav button.active { background: linear-gradient(90deg, rgba(201, 110, 77, 0.24) 0%, rgba(255, 255, 255, 0.06) 100%); color: #fff4ed; font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+    #sidebar .sidebar-footer { padding: 14px 20px 20px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 11px; color: rgba(243, 238, 231, 0.54); }
 
     /* ── Main ── */
     #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 
     #topbar {
       height: var(--topbar-h);
-      background: var(--surface); border-bottom: 1px solid var(--border);
+      background: rgba(255, 251, 245, 0.78); border-bottom: 1px solid rgba(219, 205, 188, 0.72);
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 var(--gap); flex-shrink: 0;
+      padding: 0 28px; flex-shrink: 0; backdrop-filter: blur(18px);
     }
     .mobile-nav-toggle {
       display: none;
@@ -105,8 +117,8 @@
       border: 0;
     }
 
-    #topbar .page-title { font-size: 14px; font-weight: 600; color: var(--text); }
-    .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    #topbar .page-title { font-family: "Oswald", "Arial Narrow", sans-serif; font-size: 20px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent-ink), #102432); color: #fff7ef; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 24px rgba(16, 36, 50, 0.18); }
     .topbar-right { display: flex; gap: 8px; align-items: center; }
 
     /* ── Content — v17: overflow-x visible so table wrapper can scroll freely ── */
@@ -114,7 +126,7 @@
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;   /* clipping axis — table wrap handles its own x-scroll */
-      padding: var(--gap);
+      padding: 28px;
       min-width: 0;
     }
 
@@ -122,7 +134,7 @@
     .section { display: none; }
     .section.active { display: block; }
     .section-header { margin-bottom: var(--gap); }
-    .section-header h2 { font-size: 20px; font-weight: 700; color: var(--text); }
+    .section-header h2 { font-family: "Oswald", "Arial Narrow", sans-serif; font-size: 34px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--text); }
     .section-header p { margin-top: 4px; font-size: 13px; color: var(--muted); }
     hr.divider { border: none; border-top: 1px solid var(--border); margin-bottom: var(--gap); }
 
@@ -168,11 +180,12 @@
     .review-block .block-placeholder { font-size: 13px; color: #ccc; font-style: italic; }
 
     /* ── Buttons ── */
-    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius); border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: background .12s; }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { background: #3451c7; }
-    .btn-ghost { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
-    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 14px; border: 1px solid var(--border); cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; transition: transform .12s, box-shadow .12s, background .12s, border-color .12s; box-shadow: 0 6px 14px rgba(24, 36, 45, 0.05); }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 10px 18px rgba(24, 36, 45, 0.08); border-color: #cbb49f; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent) 0%, #bf7858 100%); color: #fff8f1; border-color: rgba(191, 120, 88, 0.7); }
+    .btn-primary:hover { background: linear-gradient(135deg, #cf7654 0%, #b76749 100%); }
+    .btn-ghost { background: rgba(255, 251, 245, 0.88); color: var(--accent-ink); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: rgba(255, 247, 239, 0.96); color: var(--accent-ink); }
 
     /* ── Debug panel ── */
     .debug-panel { display:none !important; background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius); padding: 14px 18px; margin-bottom: var(--gap); font-size: 12px; }
@@ -278,23 +291,24 @@
       border-collapse: collapse;
       font-size: 13px;
       background: var(--surface);
+      box-shadow: var(--shadow-card);
     }
 
-    .data-table thead { background: var(--bg); }
+    .data-table thead { background: rgba(239, 228, 212, 0.72); }
     .data-table th {
-      text-align: left; padding: 10px 12px;
+      text-align: left; padding: 14px 14px;
       font-size: 10px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: .06em; color: var(--muted);
-      border-bottom: 1px solid var(--border); white-space: nowrap;
+      letter-spacing: .09em; color: var(--muted);
+      border-bottom: 1px solid rgba(219, 205, 188, 0.72); white-space: nowrap;
     }
     .data-table td {
-      padding: 10px 12px; border-bottom: 1px solid var(--border);
+      padding: 14px 14px; border-bottom: 1px solid rgba(219, 205, 188, 0.72);
       color: var(--text); vertical-align: top;
     }
     .data-table th:first-child,
     .data-table td:first-child { position: sticky; left: 0; background: inherit; z-index: 2; border-right: 1px solid var(--border); }
     .data-table tbody tr:last-child td { border-bottom: none; }
-    .data-table tbody tr:hover td { background: var(--bg); }
+    .data-table tbody tr:hover td { background: rgba(239, 228, 212, 0.38); }
 
     .data-table thead th { z-index: 3; }   /* headers above data cells when sticky */
 
@@ -305,6 +319,7 @@
     .col-completion { width: 200px; }
     .col-date   { width: 120px; min-width: 120px; }
     .col-owner  { width: 88px; }
+    .col-actions { width: 270px; min-width: 270px; }
     .data-table td.col-bool { text-align: center; vertical-align: middle; }
     .data-table td.col-date,
     .data-table th.col-date { white-space: nowrap; }
@@ -612,16 +627,21 @@
     .assets-placeholder .ph-text { font-weight: 500; color: var(--text); margin-bottom: 4px; }
     .release-schedule-card {
       border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border-radius: 22px;
       background: var(--surface);
       margin-bottom: 12px;
       overflow: hidden;
+      box-shadow: var(--shadow-card);
     }
     .release-schedule-summary {
       list-style: none;
       cursor: pointer;
-      padding: 12px 14px;
-      font-weight: 700;
+      padding: 18px 22px;
+      font-family: "Oswald", "Arial Narrow", sans-serif;
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: .03em;
+      text-transform: uppercase;
       color: var(--text);
       display: flex;
       align-items: center;
@@ -630,8 +650,8 @@
     }
     .release-schedule-summary::-webkit-details-marker { display: none; }
     .release-schedule-content {
-      border-top: 1px solid var(--border);
-      padding: 12px 14px;
+      border-top: 1px solid rgba(219, 205, 188, 0.7);
+      padding: 18px 22px;
       display: grid;
       gap: 10px;
     }
@@ -651,16 +671,21 @@
 
     /* ── Contracts module (v22) ── */
     .contracts-toolbar {
-      display: flex; align-items: center; gap: 10px;
+      display: flex; align-items: center; gap: 12px;
       margin-bottom: var(--gap);
+      padding: 20px 22px;
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      background: var(--surface);
+      box-shadow: var(--shadow-card);
     }
 
     .contracts-search {
-      flex: 1; max-width: 280px; padding: 7px 12px;
-      border: 1px solid var(--border); border-radius: var(--radius);
-      font-size: 13px; background: var(--surface); color: var(--text); outline: none;
+      flex: 1; max-width: 320px; padding: 11px 14px;
+      border: 1px solid var(--border); border-radius: 14px;
+      font-size: 14px; background: rgba(255,255,255,0.52); color: var(--text); outline: none;
     }
-    .contracts-search:focus { border-color: var(--accent); }
+    .contracts-search:focus { border-color: var(--accent); background: rgba(255,255,255,0.86); }
 
     .filter-btn {
       padding: 6px 12px; font-size: 12px; font-weight: 500;
@@ -773,12 +798,13 @@
 
     /* Row action buttons */
     .contract-row-btn {
-      padding: 3px 8px; font-size: 11px; font-weight: 500;
-      border-radius: 4px; border: 1px solid var(--border);
-      background: var(--surface); color: var(--muted);
+      padding: 7px 11px; font-size: 11px; font-weight: 700;
+      letter-spacing: .03em; text-transform: uppercase;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: rgba(255, 251, 245, 0.88); color: var(--accent-ink);
       cursor: pointer; transition: all .12s; white-space: nowrap; margin-left: 4px;
     }
-    .contract-row-btn:hover  { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .contract-row-btn:hover  { background: rgba(201, 110, 77, 0.12); color: var(--accent-dark); border-color: rgba(201, 110, 77, 0.35); }
     .contract-row-btn.del:hover { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
 
     /* ── Combo-entry (v23): preset dropdown + custom text input side by side ── */
@@ -1143,12 +1169,13 @@
 
     /* Edit button in action row */
     .action-edit-row-btn {
-      padding: 2px 7px; font-size: 11px; font-weight: 500;
-      border: 1px solid var(--border); border-radius: 4px;
-      background: var(--surface); color: var(--muted);
+      padding: 7px 11px; font-size: 11px; font-weight: 700;
+      letter-spacing: .03em; text-transform: uppercase;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: rgba(255, 251, 245, 0.88); color: var(--accent-ink);
       cursor: pointer; transition: all .12s; white-space: nowrap; margin-right: 4px;
     }
-    .action-edit-row-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .action-edit-row-btn:hover { background: rgba(201, 110, 77, 0.12); color: var(--accent-dark); border-color: rgba(201, 110, 77, 0.35); }
 
     /* Updated action-row grid to accommodate edit button */
     .action-row {
@@ -1177,9 +1204,10 @@
     .release-edit-panel {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px;
+      border-radius: 22px;
+      padding: 24px;
       margin-bottom: var(--gap);
+      box-shadow: var(--shadow-card);
     }
     .release-edit-backdrop {
       position: fixed;
@@ -1198,14 +1226,14 @@
       overflow: auto;
       margin: 0;
       z-index: 1200;
-      box-shadow: 0 24px 80px rgba(15, 23, 42, 0.25);
+      box-shadow: 0 28px 90px rgba(24, 36, 45, 0.18);
     }
 
     .release-edit-panel.hidden { display: none; }
 
     .release-edit-title {
       font-size: 11px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: .07em; color: var(--muted); margin-bottom: 14px;
+      letter-spacing: .11em; color: var(--muted); margin-bottom: 18px;
       display: flex; align-items: center; justify-content: space-between;
     }
 
@@ -1227,9 +1255,9 @@
     .release-edit-input,
     .release-edit-select,
     .release-edit-textarea {
-      padding: 7px 10px;
-      border: 1px solid var(--border); border-radius: var(--radius);
-      font-size: 13px; color: var(--text); background: var(--surface);
+      padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 14px;
+      font-size: 13px; color: var(--text); background: rgba(255,255,255,0.58);
       outline: none; transition: border-color .12s; font-family: inherit;
     }
 
@@ -1440,14 +1468,14 @@
 
     /* Release delete button */
     .pipeline-del-btn {
-      padding: 2px 7px; font-size: 11px; font-weight: 500;
-      border: 1px solid var(--border); border-radius: 4px;
-      background: var(--surface); color: #b91c1c;
+      padding: 7px 10px; font-size: 11px; font-weight: 700;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: rgba(255, 251, 245, 0.88); color: #b91c1c;
       cursor: pointer; transition: all .12s; white-space: nowrap; margin-left: 4px;
     }
     .pipeline-del-btn:hover { background: #fef2f2; border-color: #fca5a5; }
     .pipeline-row-actions {
-      display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap;
+      display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; min-width: 250px;
     }
     .pipeline-status-toggle {
       display: inline-flex; align-items: center; gap: 4px;
@@ -2345,7 +2373,7 @@
                   <th class="col-assets">Assets Complete?</th>
                   <th class="col-date">Release / Deadline</th>
                   <th class="col-owner">Owner</th>
-                  <th style="width:60px;"></th>
+                  <th class="col-actions"></th>
                 </tr>
               </thead>
               <tbody id="releases-tbody"></tbody>
@@ -2372,7 +2400,7 @@
                   <th class="col-assets">Assets Complete?</th>
                   <th class="col-date">Release / Deadline</th>
                   <th class="col-owner">Owner</th>
-                  <th style="width:180px;"></th>
+                  <th class="col-actions"></th>
                 </tr>
               </thead>
               <tbody id="releases-archive-tbody"></tbody>
@@ -4715,7 +4743,7 @@
             '<td class="col-assets assets-complete-cell">'+assetsCompleteCell(r.id)+'</td>'+
             '<td class="col-date">'+dt+'</td>'+
             '<td class="col-owner">'+escapeHtml(r.owner||'—')+'</td>'+
-            '<td><div class="pipeline-row-actions">' + (hasChildTracks ? '<button class="contract-row-btn pipeline-tracks-toggle-btn" data-id="'+r.id+'">Tracks</button>' : '') + editBtnHtml+statusControlsHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></div></td>';
+            '<td class="col-actions"><div class="pipeline-row-actions">' + (hasChildTracks ? '<button class="contract-row-btn pipeline-tracks-toggle-btn" data-id="'+r.id+'">Tracks</button>' : '') + editBtnHtml+statusControlsHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></div></td>';
 
           const selectEl = tr.querySelector('[data-release-select]');
           if (selectEl) {
