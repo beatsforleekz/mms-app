@@ -299,17 +299,13 @@
     .data-table thead th { z-index: 3; }   /* headers above data cells when sticky */
 
     .col-id     { width: 60px; }
-    .col-type   { width: 90px; }
-    .col-role   { width: 110px; }
     .col-status { width: 110px; }
     .col-bool   { width: 100px; text-align: center; }
     .col-assets { width: 180px; }
     .col-completion { width: 220px; }
-    .col-date   { width: 115px; }
+    .col-date   { width: 100px; }
     .col-owner  { width: 100px; }
-    .col-notes  { min-width: 140px; max-width: 200px; }
     .data-table td.col-bool { text-align: center; vertical-align: middle; }
-    .data-table td.col-notes { font-size: 12px; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* Release Pipeline sticky columns use explicit widths so the left offsets
        stay aligned after filtering/sorting/scrolling in Safari. */
@@ -2321,14 +2317,11 @@
                   <th class="col-id">ID</th>
                   <th class="col-title">Song / Work Title</th>
                   <th class="col-artist">Artist</th>
-                  <th class="col-type">Type</th>
-                  <th class="col-role">Company Role</th>
                   <th class="col-status">Status</th>
                   <th class="col-completion">Completion<br><small style="font-weight:400;font-size:9px;text-transform:none;letter-spacing:0;">role-specific indicators</small></th>
                   <th class="col-assets">Assets Complete?</th>
                   <th class="col-date">Release / Deadline</th>
                   <th class="col-owner">Owner</th>
-                  <th class="col-notes">Notes</th>
                   <th style="width:60px;"></th>
                 </tr>
               </thead>
@@ -2351,14 +2344,11 @@
                   <th class="col-id">ID</th>
                   <th class="col-title">Song / Work Title</th>
                   <th class="col-artist">Artist</th>
-                  <th class="col-type">Type</th>
-                  <th class="col-role">Company Role</th>
                   <th class="col-status">Status</th>
                   <th class="col-completion">Completion<br><small style="font-weight:400;font-size:9px;text-transform:none;letter-spacing:0;">role-specific indicators</small></th>
                   <th class="col-assets">Assets Complete?</th>
                   <th class="col-date">Release / Deadline</th>
                   <th class="col-owner">Owner</th>
-                  <th class="col-notes">Notes</th>
                   <th style="width:180px;"></th>
                 </tr>
               </thead>
@@ -3512,6 +3502,12 @@
       return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     }
 
+    function formatPipelineDateDisplay(value) {
+      const dt = parseDateValue(value);
+      if (!dt) return '—';
+      return dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    }
+
     function todayYMDLocal() {
       const now = new Date();
       const year = now.getFullYear();
@@ -4620,7 +4616,7 @@
           targetBody.innerHTML = '';
           rows.forEach(function(r) {
           const sc = statusBadgeClassForPipeline(r.status);
-          const dt = formatDateDisplay(r.release_date);
+          const dt = formatPipelineDateDisplay(r.release_date);
           const ne = escapeHtml(r.notes || '');
           const tr = document.createElement('tr');
           tr.dataset.releaseId = r.id;
@@ -4657,14 +4653,11 @@
             '<td class="col-id"><span class="id-display" title="' + rawId + '">' + shortId + '</span></td>'+
             '<td class="col-title"><strong>'+escapeHtml(titleDisplay)+'</strong>' + (parentLabel ? '<span style="display:inline-block;margin-left:8px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;background:#eef2ff;color:#3730a3;">'+escapeHtml(parentLabel)+'</span>' : '') + '</td>'+
             '<td class="col-artist">'+escapeHtml(artistDisplay)+'</td>'+
-            '<td class="col-type">'+escapeHtml(r.type||'—')+'</td>'+
-            '<td class="col-role">'+escapeHtml(r.company_role||'—')+'</td>'+
             '<td class="col-status"><span class="status-badge '+sc+'">'+escapeHtml(r.status||'—')+'</span></td>'+
             '<td class="col-completion role-completion-cell">'+completionCell+'</td>'+
             '<td class="col-assets assets-complete-cell">'+assetsCompleteCell(r.id)+'</td>'+
             '<td class="col-date">'+dt+'</td>'+
             '<td class="col-owner">'+escapeHtml(r.owner||'—')+'</td>'+
-            '<td class="col-notes" title="'+ne+'">'+(ne||'—')+'</td>'+
             '<td><div class="pipeline-row-actions">' + (hasChildTracks ? '<button class="contract-row-btn pipeline-tracks-toggle-btn" data-id="'+r.id+'">Tracks</button>' : '') + editBtnHtml+statusControlsHtml+'<button class="pipeline-del-btn" data-id="'+r.id+'">✕</button></div></td>';
 
           const selectEl = tr.querySelector('[data-release-select]');
@@ -4736,7 +4729,7 @@
               const order = track && track.track_order ? (String(track.track_order) + '. ') : '';
               return '<div style="padding:4px 0;border-bottom:1px dashed var(--border);"><strong>' + escapeHtml(order + title) + '</strong><span style="font-size:12px;color:var(--muted);margin-left:8px;">' + escapeHtml((artist || '—') + version) + '</span></div>';
             }).join('');
-            childTr.innerHTML = '<td></td><td colspan="12" style="background:var(--bg);"><div style="padding:8px 10px;">' + childList + '</div></td>';
+            childTr.innerHTML = '<td></td><td colspan="9" style="background:var(--bg);"><div style="padding:8px 10px;">' + childList + '</div></td>';
             targetBody.appendChild(childTr);
             const toggleBtn = tr.querySelector('.pipeline-tracks-toggle-btn');
             if (toggleBtn) {
