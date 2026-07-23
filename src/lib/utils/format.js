@@ -33,6 +33,14 @@ export function priorityRank(priority) {
 }
 
 export function compareActions(a, b) {
+  const aStatus = String((a && a.status) || '').toLowerCase();
+  const bStatus = String((b && b.status) || '').toLowerCase();
+  if (aStatus === 'done' && bStatus === 'done') {
+    const aCompleted = a && a.completed_date ? new Date(a.completed_date).getTime() : 0;
+    const bCompleted = b && b.completed_date ? new Date(b.completed_date).getTime() : 0;
+    if (aCompleted !== bCompleted) return bCompleted - aCompleted;
+  }
+
   const aToday = actionTodayBool(a && a.to_do_today) ? 0 : 1;
   const bToday = actionTodayBool(b && b.to_do_today) ? 0 : 1;
   if (aToday !== bToday) return aToday - bToday;

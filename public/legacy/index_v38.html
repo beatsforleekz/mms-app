@@ -7289,6 +7289,14 @@
     }
 
     function compareActionsForList(a, b) {
+      const aStatus = String((a && a.status) || '').toLowerCase();
+      const bStatus = String((b && b.status) || '').toLowerCase();
+      if (aStatus === 'done' && bStatus === 'done') {
+        const aCompleted = a && a.completed_date ? actionSortValue(a.completed_date) : 0;
+        const bCompleted = b && b.completed_date ? actionSortValue(b.completed_date) : 0;
+        if (aCompleted !== bCompleted) return bCompleted - aCompleted;
+      }
+
       const aToday = actionTodayBool(a && a.to_do_today) ? 0 : 1;
       const bToday = actionTodayBool(b && b.to_do_today) ? 0 : 1;
       if (aToday !== bToday) return aToday - bToday;
